@@ -1,6 +1,24 @@
-node_modules/
+# Environment & Secrets
 .env
-dist/
+.env.*
+!.env.example
+
+# Raw Data (3 232 ta xom JSON fayllar)
 data/raw/
+
+# Python & Build
 __pycache__/
+*.py[cod]
+*$py.class
+*.log
+.pytest_cache/
+.coverage
 .venv/
+dist/
+node_modules/
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
