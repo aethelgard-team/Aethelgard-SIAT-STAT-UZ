@@ -4,7 +4,7 @@ SIAT STAT DWH: Model Context Protocol (MCP) Server (mcp_server/server.py)
 Loyiha: siat.stat.uz MCP Server
 Muallif: Siddiq (Backend & Database Lead)
 Tavsif:
-  Claude Desktop, Cursor va boshqa LLM agentlari uchun 2.58M qatorli DWH
+  Claude Desktop va MCP Inspector orqali 2.58M qatorli DWH
   ma'lumotlarini taqdim etuvchi rasmiy MCP server.
   Transport: stdio (standart) yoki sse / streamable-http.
 =============================================================================

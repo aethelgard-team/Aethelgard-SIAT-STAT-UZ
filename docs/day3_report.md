@@ -2,7 +2,7 @@
 
 ## 1. Infratuzilma va Arxitektura
 
-Tashqi AI agentlari (Claude Desktop, Cursor, Gemini) 2.58 million qatorli DWH ma'lumotlarini soniyaning ulushida qidirishi, filtrlay olishi va tahlil qilishi uchun standartlashtirilgan MCP server backend infratuzilmasi qurildi.
+Tashqi AI agentlari (Claude Desktop, MCP Inspector) 2.58 million qatorli DWH ma'lumotlarini soniyaning ulushida qidirishi, filtrlay olishi va tahlil qilishi uchun standartlashtirilgan MCP server backend infratuzilmasi qurildi.
 
 ### Arxitektura komponentlari:
 - `mcp_server/db.py`: `psycopg2.pool.ThreadedConnectionPool` (min: 2, max: 10) havzasi orqali xavfsiz va tezkor ma'lumotlar bazasi aloqasi. Natijalar `RealDictCursor` yordamida lug'at (`dict`) formatida olinadi.
@@ -49,16 +49,39 @@ Bu yerda:
 
 ---
 
-## 4. MCP Serverni Ishga Tushirish
+## 4. MCP Serverni ishga tushirish va AI mijozlarga integratsiya
 
-Server `stdio` (Claude Desktop va MCP Inspector uchun) hamda `sse` (veb-ilovalar uchun) rejimlarida ishlaydi:
+Server `stdio` (Claude Desktop va MCP Inspector uchun) hamda `sse` (veb-ilovalar uchun) transport rejimlarini qo'llab-quvvatlaydi:
 
 ```bash
-# Standart stdio rejimi
+# Standart stdio rejimi (CLI / Agentlar uchun)
 python -m mcp_server.server
 
-# SSE transport rejimi
+# SSE transport rejimi (Web ilovalar uchun)
 python -m mcp_server.server --transport sse
+```
+
+### 4.1. MCP Inspector orqali sinovdan o'tkazish
+Rasmiy MCP Inspector interfeysi orqali server asboblarini interaktiv tekshirish:
+```bash
+npx @modelcontextprotocol/inspector python -m mcp_server.server
+```
+
+### 4.2. Claude Desktop integratsiyasi
+Claude Desktop sozlamalar fayliga (`claude_desktop_config.json`) quyidagi konfiguratsiya kiritiladi:
+```json
+{
+  "mcpServers": {
+    "siat-stat-uz": {
+      "command": "python",
+      "args": ["-m", "mcp_server.server"],
+      "cwd": "LOYIHA_ILDIZ_PAPKA_MANZILI",
+      "env": {
+        "DATABASE_URL": "postgresql://postgres:parol@localhost:5432/siat_dwh"
+      }
+    }
+  }
+}
 ```
 
 ---
