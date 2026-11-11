@@ -441,17 +441,18 @@ def load_datasets_to_dwh(datasets_data: List[dict], conn) -> Tuple[int, int, int
     """
     cursor = conn.cursor()
 
-    # 1. dim_indicator upsert
-    indicators_tuples = []
+    # 1. dim_indicator upsert (deduplicated by indicator_id)
+    indicators_map = {}
     for d in datasets_data:
         ind = d["indicator"]
-        indicators_tuples.append((
+        indicators_map[ind["indicator_id"]] = (
             ind["indicator_id"], ind["code"], ind["name_uz"], ind["name_ru"],
             ind["name_en"], ind["name_uzc"], ind["unit_uz"], ind["unit_ru"],
             ind["unit_en"], ind["unit_uzc"], ind["periodicity"], ind["organization"],
             ind["methodology"], ind["notes"], ind["last_modified_date"],
             ind["source_url"], ind["is_cumulative"]
-        ))
+        )
+    indicators_tuples = list(indicators_map.values())
 
     indicator_sql = """
         INSERT INTO dwh.dim_indicator (
@@ -481,7 +482,7 @@ def load_datasets_to_dwh(datasets_data: List[dict], conn) -> Tuple[int, int, int
     if indicators_tuples:
         execute_values(cursor, indicator_sql, indicators_tuples, page_size=100)
 
-    # 2. dim_period upsert
+    # 2. dim_period upsert (deduplicated by period_key)
     periods_map = {}
     for d in datasets_data:
         for p in d["periods"]:
@@ -503,11 +504,15 @@ def load_datasets_to_dwh(datasets_data: List[dict], conn) -> Tuple[int, int, int
     if periods_tuples:
         execute_values(cursor, period_sql, periods_tuples, page_size=500)
 
-    # 3. dim_item upsert
-    all_items_tuples = []
+    # 3. dim_item upsert (deduplicated by indicator_id and item_code)
+    items_map = {}
     indicator_ids = [d["indicator"]["indicator_id"] for d in datasets_data]
     for d in datasets_data:
-        all_items_tuples.extend(d["items"])
+        for itm in d["items"]:
+            # itm: (indicator_id, item_code, name_uz, name_ru, name_en, name_uzc)
+            key = (itm[0], itm[1])
+            items_map[key] = itm
+    all_items_tuples = list(items_map.values())
 
     item_sql = """
         INSERT INTO dwh.dim_item (
@@ -530,15 +535,16 @@ def load_datasets_to_dwh(datasets_data: List[dict], conn) -> Tuple[int, int, int
     """, (indicator_ids,))
     item_id_map = {(row[0], row[1]): row[2] for row in cursor.fetchall()}
 
-    # 4. fact_value upsert
-    fact_tuples = []
+    # 4. fact_value upsert (deduplicated by conflict key: indicator_id, item_id, period_key, snapshot_date)
+    fact_map = {}
     for d in datasets_data:
         for f in d["facts"]:
             key = (f["indicator_id"], f["item_code"])
             item_id = item_id_map.get(key)
             if item_id is None:
                 continue
-            fact_tuples.append((
+            fact_conflict_key = (f["indicator_id"], item_id, f["period_key"], f["snapshot_date"])
+            fact_map[fact_conflict_key] = (
                 f["indicator_id"],
                 item_id,
                 f["period_key"],
@@ -546,7 +552,8 @@ def load_datasets_to_dwh(datasets_data: List[dict], conn) -> Tuple[int, int, int
                 f["raw_value"],
                 f["status"],
                 f["snapshot_date"]
-            ))
+            )
+    fact_tuples = list(fact_map.values())
 
     fact_sql = """
         INSERT INTO dwh.fact_value (
@@ -677,7 +684,8 @@ def run_pipeline(limit: Optional[int] = None, specific_id: Optional[int] = None,
                 print(
                     f"[{idx}/{len(selected_files)}] ({pct:5.1f}%) | "
                     f"Faktlar: +{facts_c:,} (Jami: {total_facts:,}) | "
-                    f"Vaqt: {elapsed:.1f}s"
+                    f"Vaqt: {elapsed:.1f}s",
+                    flush=True
                 )
                 batch = []
 
