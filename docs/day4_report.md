@@ -170,6 +170,22 @@ MUVAFFAQINT: DAY 4 BARCHA INTEGRATSIYA TESTLARI 100% O'TDI!
 ===========================================================================
 ```
 
+### 4.3. CLI orqali tekshirish (Terminalda curl bilan sinov)
+
+Yo‘l xaritasining Day 4 tekshiruv mezoniga muvofiq ("curl bilan savol yuborilganda manbali javob va barcha SSE voqealari keladi"), tizimni brauzer yoki tashqi interfeyssiz, to‘g‘ridan-to‘g‘ri terminal orqali tekshirish imkoniyati mavjud.
+
+FastAPI serveri ishlab turganda (`uvicorn api.main:app --port 8000`), alohida terminal oynasida quyidagi buyruqni ishga tushiring:
+
+```bash
+curl -N -X POST http://localhost:8000/api/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "2026-yil sentyabrda mol go‘shtining o‘rtacha narxi qancha edi?"}'
+```
+
+**Kutiladigan oqim natijasi:**
+- `-N` flagi orqali oqim buferlanmasdan real vaqt rejimida terminalda ko‘rsatiladi.
+- Konsolda ketma-ket 7 ta SSE bosqich hodisalari (`stage.started`, `search.completed`, `tool.called`, `tool.result`, `generation.delta`, `verification.completed`, `done`) va yakuniy manbalar ro‘yxati oqib keladi.
+
 ---
 
 ## 5. Xulosa
