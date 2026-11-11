@@ -5,16 +5,16 @@
 -- 1. dim_indicator: SIAT statistik ko'rsatkichlari metama'lumotlari
 CREATE TABLE IF NOT EXISTS dwh.dim_indicator (
     indicator_id INTEGER PRIMARY KEY,           -- SIAT dagi o'ziga xos ID (masalan, 1308)
-    code VARCHAR(50),                           -- Klassifikatsiya kodi (masalan, '1.11.03.0001')
+    code TEXT,                                  -- Klassifikatsiya kodi (masalan, '1.11.03.0001')
     name_uz TEXT NOT NULL,                      -- O'zbekcha lotincha nomi
     name_ru TEXT,                               -- Ruscha nomi
     name_en TEXT,                               -- Inglizcha nomi
     name_uzc TEXT,                              -- O'zbekcha kirillcha nomi
-    unit_uz VARCHAR(100),                       -- O'lchov birligi (uz)
-    unit_ru VARCHAR(100),                       -- O'lchov birligi (ru)
-    unit_en VARCHAR(100),                       -- O'lchov birligi (en)
-    unit_uzc VARCHAR(100),                      -- O'lchov birligi (uzc)
-    periodicity VARCHAR(50),                    -- Davriyligi (oylik, choraklik, yillik)
+    unit_uz TEXT,                               -- O'lchov birligi (uz)
+    unit_ru TEXT,                               -- O'lchov birligi (ru)
+    unit_en TEXT,                               -- O'lchov birligi (en)
+    unit_uzc TEXT,                              -- O'lchov birligi (uzc)
+    periodicity TEXT,                           -- Davriyligi (oylik, choraklik, yillik)
     organization TEXT,                          -- Mas'ul boshqarma / tashkilot
     methodology TEXT,                           -- Hisoblash metodikasi
     notes TEXT,                                 -- Qo'shimcha izohlar

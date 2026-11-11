@@ -46,16 +46,16 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 -- 4.1. dim_indicator: Statistik ko'rsatkichlar
 CREATE TABLE IF NOT EXISTS dwh.dim_indicator (
     indicator_id INTEGER PRIMARY KEY,           -- SIAT ID (masalan: 1308)
-    code VARCHAR(50),                           -- Rasmiy kod (masalan: '1.11.03.0001')
+    code TEXT,                                  -- Rasmiy kod (masalan: '1.11.03.0001')
     name_uz TEXT NOT NULL,
     name_ru TEXT,
     name_en TEXT,
     name_uzc TEXT,
-    unit_uz VARCHAR(100),
-    unit_ru VARCHAR(100),
-    unit_en VARCHAR(100),
-    unit_uzc VARCHAR(100),
-    periodicity VARCHAR(50),
+    unit_uz TEXT,
+    unit_ru TEXT,
+    unit_en TEXT,
+    unit_uzc TEXT,
+    periodicity TEXT,
     organization TEXT,
     methodology TEXT,
     notes TEXT,
