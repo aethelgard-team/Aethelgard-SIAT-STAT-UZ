@@ -1,37 +1,77 @@
-# Day 2: DWH Sxemasi, Arxitektura va Ingestion
+# Day 2: DWH arxitekturasi va ma'lumotlarni ommaviy yuklash (Bulk Ingestion)
 
-## 📌 Joriy Holat: 100% (Yakunlandi)
+## 1. Infratuzilma va DDL sxemalar
 
-### ✅ Bajarilgan ishlar:
-1. **Sxemalar:** PostgreSQL `siat_dwh` bazasida `raw`, `staging`, `dwh`, `mart` sxemalari to'liq ochildi.
-2. **O'lcham jadvallari (Dimensions):**
-   - `dwh.dim_indicator`: 3 232 ta statistik ko'rsatkich metama'lumotlari.
-   - `dwh.dim_item`: 131 587 ta klassifikator (kodlar qat'iy matn/`VARCHAR` formatida saqlandi).
-   - `dwh.dim_period`: Davrlar iyerarxiyasi (yil, chorak, oy tahlillari uchun).
-3. **Fakt jadvali (Facts):** `dwh.fact_value` jadvali 2 580 045 ta tozalangan faktik ko'rsatkich bilan to'ldirildi.
-4. **Tezkor qidiruv:** `pg_trgm` va 15 ta `tsvector` GIN indekslari sozlandi (`dwh/sql/schema.sql`).
-5. **Ingestion Pipeline (`etl/load_dwh.py`):**
-   - [x] `etl/load_dwh.py` skriptining mantiqiy rejasini tasdiqlash.
-   - [x] Transformatsiya va to'plamli yuklash (`psycopg2.extras.execute_values`) skriptini yozish.
-   - [x] 10 ta datasetda namunaviy sinov (1308-dataset tekshiruvi muvaffaqiyatli o'tdi).
-   - [x] 3 232 ta JSON faylni DWH ga to'liq quyish (Full Ingestion).
+Ma'lumotlar bazasi: PostgreSQL (`siat_dwh`).
+Sxemani yaratish:
+```bash
+psql -U postgres -d siat_dwh -f dwh/sql/schema.sql
+```
 
----
+Sxema arxitekturasi:
+- `raw`: Xom SDMX fayllar va oraliq ma'lumotlar uchun
+- `staging`: Tozalash va deduplikatsiya bosqichi
+- `dwh`: Yulduzsimon (Star schema) ombor qatlami
+- `mart`: Analitik agregatsiyalar va vitrinalar
 
-## 📊 Yakuniy Ingestion Statistikasi
-- **Qayta ishlangan JSON fayllar:** 3 232 ta (100%)
-- **Statistik ko'rsatkichlar (`dim_indicator`):** 3 232 ta
-- **Klassifikator qatorlari (`dim_item`):** 131 587 ta
-- **Jami saqlangan faktlar (`fact_value`):** 2 580 045 ta
-- **Tozalangan Kirillcha «М» davrlari:** 215 876 ta (barchasi lotin «M» ga normallashtirildi)
-- **Tozalangan 0.0 qiymatlar:** 284 209 ta (`value = NULL`, `status = 'zero_marked'`)
-- **Umumiy sarflangan vaqt:** 241.97 soniya (~4.03 daqiqa)
+Jadvallar tuzilishi:
+| Jadval nomi | Turi | Tavsifi |
+|---|---|---|
+| `dwh.dim_indicator` | Dimension | Ko'rsatkich metama'lumotlari (nomlar, o'lchov birligi, davriylik) |
+| `dwh.dim_item` | Dimension | Klassifikatorlar (kodlar VARCHAR formatida, bosh nollar saqlangan) |
+| `dwh.dim_period` | Dimension | Standartlashtirilgan davrlar (yil, chorak, oy) |
+| `dwh.fact_value` | Fact | Statistik qiymatlar (value, raw_value, snapshot_date, status) |
 
----
+Optimallashtirish va qidiruv:
+- `pg_trgm` kengaytmasi faollashtirildi
+- Trigram indekslar va 15 ta `tsvector` GIN to'liq matnli qidiruv indekslari o'rnatildi
+- Takrorlanishning oldini olish: `UNIQUE(indicator_id, item_id, period_key, snapshot_date)`
 
-## 🎯 Benchmark Tekshiruvi
-- **Ko'rsatkich #1308:** Bozorlar va do‘konlardagi ayrim tovarlarning o‘rtacha narxlari dinamikasi
-- **Mahsulot:** Mol go'shti (kod: `017`)
-- **Davr:** `2026-M09`
-- **Bazadagi qiymat:** `127,857.3 so'm` (`status: valid`, `snapshot_date: 2026-11-11`)
-- **Holati:** ✅ Rasmiy ko'rsatkich bilan 100% teng.
+## 2. ETL transformatsiya va yuklash
+
+To'plamli yuklash skriptini ishga tushirish:
+```bash
+# 10 ta datasetda namunaviy test
+python etl/load_dwh.py --limit 10
+
+# Barcha 3 232 ta faylni to'liq yuklash (batch size: 5000)
+python etl/load_dwh.py
+```
+
+Ijro ko'rsatkichlari (Execution stats):
+- Qayta ishlangan JSON fayllar: 3 232 ta (100.0%)
+- Jami yozilgan faktlar (`fact_value`): 2 580 045 qator
+- Klassifikatorlar soni (`dim_item`): 131 587 ta
+- Ko'rsatkichlar soni (`dim_indicator`): 3 232 ta
+- Tozalangan kirill 'М' davrlari: 215 876 ta
+- Normallashtirilgan 0.0 qiymatlar (`zero_marked`): 284 209 ta
+- Umumiy sarflangan vaqt: 241.97 soniya (~4 daqiqa)
+
+## 3. Baza verifikatsiyasi va yaxlitlik tekshiruvi
+
+PostgreSQL'da bajarilgan nazorat so'rovi:
+```sql
+SELECT 
+    (SELECT count(*) FROM dwh.dim_indicator) AS indicators_count,
+    (SELECT count(*) FROM dwh.dim_item) AS items_count,
+    (SELECT count(*) FROM dwh.fact_value) AS total_facts,
+    (SELECT count(*) FROM dwh.fact_value WHERE status = 'zero_marked') AS zero_marked_facts;
+```
+
+Amaldagi natija:
+```text
+ indicators_count | items_count | total_facts | zero_marked_facts 
+------------------+-------------+-------------+-------------------
+             3232 |      131587 |     2580045 |            284209
+```
+
+Roadmap bo'yicha aniq qiymat tekshiruvi:
+```sql
+SELECT i.indicator_id, it.item_code, it.name_uz, f.period_key, f.value, f.status
+FROM dwh.fact_value f
+JOIN dwh.dim_indicator i ON f.indicator_id = i.indicator_id
+JOIN dwh.dim_item it ON f.item_id = it.item_id
+WHERE i.indicator_id = 1308 AND it.item_code = '017' AND f.period_key = '2026-M09';
+```
+
+Natija: `127857.3000` (Status: `valid`, SIAT rasmiy statistikasiga 100% mos).
