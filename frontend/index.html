@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aethelgard · SIAT</title>
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Aethelgard <span>· SIAT statistika</span></h1>
+      <nav class="tabs" aria-label="Sahifalar">
+        <a href="#/ask">Savol berish</a>
+        <a href="#/catalog">Bazada nima bor</a>
+      </nav>
+      <p id="backend-status" class="badge">Backend: tekshirilmoqda…</p>
+    </header>
+
+    <!-- 1-sahifa: savol -> javob -> manba -->
+    <main id="view-ask" class="layout">
+      <section class="panel" aria-labelledby="ask-title">
+        <h2 id="ask-title">Savol bering</h2>
+        <form id="ask-form">
+          <label for="question" class="sr-only">Savol</label>
+          <textarea id="question" rows="3"
+            placeholder="Masalan: 2026-yil sentyabrda mol go'shtining o'rtacha narxi qancha?"></textarea>
+          <button type="submit">Yuborish</button>
+        </form>
+
+        <h3>Bosqichlar</h3>
+        <ol id="stages" class="stages"></ol>
+      </section>
+
+      <section class="panel scene-panel" aria-label="3D sahna">
+        <div id="scene"></div>
+        <div id="scene-labels" class="scene-labels"></div>
+        <div id="scene-info" class="scene-info" role="dialog" aria-label="Ustun ma'lumoti" hidden></div>
+        <p id="scene-fallback" class="fallback" hidden>
+          WebGL ishlamayapti — chapdagi 2D ko'rinishdan foydalaning.
+        </p>
+      </section>
+
+      <section class="panel wide" aria-labelledby="answer-title">
+        <h2 id="answer-title">Javob</h2>
+        <p id="answer" class="answer">Hali savol berilmagan.</p>
+        <ol id="sources" class="sources"></ol>
+
+        <div class="grid-2">
+          <div>
+            <h3>Topilgan ko'rsatkichlar (RRF)</h3>
+            <ol id="search-results" class="search-results"></ol>
+          </div>
+          <div>
+            <h3>Tekshiruv (har bir jumla)</h3>
+            <ul id="verification" class="verification"></ul>
+          </div>
+        </div>
+
+        <h3>Natija grafigi</h3>
+        <div id="result-chart" class="chart-box"></div>
+      </section>
+    </main>
+
+    <!-- 2-sahifa: bazada nima bor -->
+    <main id="view-catalog" class="single" hidden>
+      <section class="panel">
+        <h2>Bazada nima bor</h2>
+        <div id="db-stats" class="stats"></div>
+        <form id="catalog-form" class="row">
+          <label for="catalog-query" class="sr-only">Ko'rsatkich qidirish</label>
+          <input id="catalog-query" type="search" placeholder="Masalan: narx, aholi, eksport" />
+          <button type="submit">Qidirish</button>
+        </form>
+        <p id="catalog-status" class="muted"></p>
+        <ol id="catalog-results" class="catalog-results"></ol>
+      </section>
+    </main>
+
+    <!-- 3-sahifa: bitta ko'rsatkich -->
+    <main id="view-indicator" class="single" hidden>
+      <section id="indicator" class="panel"></section>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
