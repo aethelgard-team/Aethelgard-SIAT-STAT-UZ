@@ -133,6 +133,26 @@ def get_stats():
         """)
         row = cur.fetchone()
 
+        cur.execute("""
+            SELECT split_part(code, '.', 1) AS section,
+                   count(*)                 AS count,
+                   array_agg(indicator_id ORDER BY indicator_id) AS indicator_ids
+            FROM dwh.dim_indicator
+            WHERE code IS NOT NULL
+            GROUP BY 1
+            ORDER BY 1;
+        """)
+        cat_rows = cur.fetchall()
+
+    categories = [
+        {
+            "section": r["section"],
+            "count": r["count"],
+            "indicator_ids": r["indicator_ids"]
+        }
+        for r in cat_rows
+    ]
+
     return {
         "status": "online",
         "database": "siat_dwh",
@@ -142,7 +162,8 @@ def get_stats():
         "total_facts": row["total_facts"],
         "valid_facts": row["valid_facts"],
         "zero_marked_facts": row["zero_marked_facts"],
-        "snapshot_date": "2026-11-11"
+        "snapshot_date": "2026-11-11",
+        "categories": categories
     }
 
 
