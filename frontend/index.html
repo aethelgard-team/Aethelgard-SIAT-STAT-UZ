@@ -5,65 +5,162 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Aethelgard · SIAT</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
-  <body>
-    <header class="topbar">
-      <h1>Aethelgard <span>· SIAT statistika</span></h1>
+  <body class="route-ask">
+    <!-- 3D sahna butun ekran fonida turadi; panellar uning ustida -->
+    <div id="scene-stage" class="scene-stage" aria-label="3D sahna: ombor, agent va natija">
+      <div id="scene"></div>
+      <div class="vignette" aria-hidden="true"></div>
+      <div id="scene-labels" class="scene-labels"></div>
+      <div id="scene-info" class="scene-info glass" role="dialog" aria-label="Ustun ma'lumoti" hidden></div>
+    </div>
+
+    <p id="demo-banner" class="demo-banner" role="status" hidden></p>
+
+    <header class="topbar glass">
+      <a class="brand" href="#/ask" aria-label="Aethelgard · SIAT — bosh sahifa">
+        <span class="logo" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.6">
+            <circle cx="12" cy="12" r="3.2" fill="rgba(56,189,248,.35)" />
+            <ellipse cx="12" cy="12" rx="9.5" ry="4" transform="rotate(-30 12 12)" />
+            <ellipse cx="12" cy="12" rx="9.5" ry="4" transform="rotate(30 12 12)" stroke="#10b981" />
+          </svg>
+        </span>
+        <span class="brand-text"><strong>Aethelgard<span>·</span>SIAT</strong><small>Statistika · AI observatoriya</small></span>
+      </a>
       <nav class="tabs" aria-label="Sahifalar">
         <a href="#/ask">Savol berish</a>
         <a href="#/catalog">Bazada nima bor</a>
       </nav>
-      <p id="backend-status" class="badge">Backend: tekshirilmoqda…</p>
+      <div class="top-right">
+        <p id="agent-state" class="agent-state" aria-live="polite">agent · kutmoqda</p>
+        <p id="backend-status" class="badge">Backend: tekshirilmoqda…</p>
+      </div>
     </header>
 
     <!-- 1-sahifa: savol -> javob -> manba -->
-    <main id="view-ask" class="layout">
-      <section class="panel" aria-labelledby="ask-title">
-        <h2 id="ask-title">Savol bering</h2>
-        <form id="ask-form">
-          <label for="question" class="sr-only">Savol</label>
-          <textarea id="question" rows="3"
-            placeholder="Masalan: 2026-yil sentyabrda mol go'shtining o'rtacha narxi qancha?"></textarea>
-          <button type="submit">Yuborish</button>
-        </form>
-
-        <h3>Bosqichlar</h3>
-        <ol id="stages" class="stages"></ol>
-      </section>
-
-      <section class="panel scene-panel" aria-label="3D sahna">
-        <div id="scene"></div>
-        <div id="scene-labels" class="scene-labels"></div>
-        <div id="scene-info" class="scene-info" role="dialog" aria-label="Ustun ma'lumoti" hidden></div>
-        <p id="scene-fallback" class="fallback" hidden>
-          WebGL ishlamayapti — chapdagi 2D ko'rinishdan foydalaning.
-        </p>
-      </section>
-
-      <section class="panel wide" aria-labelledby="answer-title">
-        <h2 id="answer-title">Javob</h2>
-        <p id="answer" class="answer">Hali savol berilmagan.</p>
-        <ol id="sources" class="sources"></ol>
-
-        <div class="grid-2">
-          <div>
-            <h3>Topilgan ko'rsatkichlar (RRF)</h3>
-            <ol id="search-results" class="search-results"></ol>
+    <main id="view-ask" class="ask-layout">
+      <aside class="glass panel panel-left" aria-labelledby="ask-title">
+        <section>
+          <div class="sec-h"><h2 id="ask-title">Savol</h2><span class="kbd">⏎ Enter</span></div>
+          <form id="ask-form" class="ask">
+            <label for="question" class="sr-only">Savol</label>
+            <svg class="spark" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" opacity=".6"/></svg>
+            <textarea id="question" rows="2" role="combobox" aria-autocomplete="list" aria-controls="suggest" aria-expanded="false"
+              placeholder="Masalan: 2026-yil sentyabrda mol go'shti narxi qancha?"></textarea>
+            <button type="submit" class="send" aria-label="Savolni yuborish">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </button>
+          </form>
+          <!-- Yozayotganda: bazadagi haqiqiy ko'rsatkichlar (backend qidiruvi) -->
+          <div id="suggest-box" class="suggest-box" hidden>
+            <p class="suggest-cap">Bazada bor:</p>
+            <ul id="suggest" class="suggest" role="listbox" aria-label="Bazadagi ko'rsatkichlar"></ul>
           </div>
-          <div>
-            <h3>Tekshiruv (har bir jumla)</h3>
-            <ul id="verification" class="verification"></ul>
+          <div class="chips" aria-label="Namuna savollar">
+            <button type="button" class="chip" data-q="2026-yil sentyabrda mol go'shtining o'rtacha narxi qancha?"><i style="--c:var(--amber)"></i>Mol go'shti narxi</button>
+            <button type="button" class="chip" data-q="O'zbekiston aholisi soni qancha?"><i style="--c:var(--green)"></i>Aholi soni</button>
+            <button type="button" class="chip" data-q="Toshkent shahrida tuxum narxi qancha?"><i style="--c:var(--blue)"></i>Tuxum narxi</button>
+          </div>
+          <!-- Savol ishlanayotganda bitta ingichka chiziq (bosqichlar ro'yxati emas) -->
+          <div class="progress" aria-live="polite">
+            <div class="pbar" aria-hidden="true"><i id="pipe-bar"></i></div>
+            <p id="pipe-text" class="pipe-text"></p>
+            <span id="pipe-state" class="sr-only"></span>
+            <button id="skip-anim" type="button" class="secondary skip" hidden>Javobni darhol ko'rsatish ⏭</button>
+          </div>
+          <!-- Oxirgi savollar (faqat shu brauzerda saqlanadi) -->
+          <div id="recent" class="recent" hidden>
+            <div class="sec-h"><h2>Oxirgi savollar</h2><button id="recent-clear" type="button" class="link-btn">Tozalash</button></div>
+            <ul id="recent-list" class="recent-list"></ul>
+          </div>
+        </section>
+      </aside>
+
+      <aside class="glass panel panel-right" aria-labelledby="tools-title">
+        <div class="sec-h"><h2 id="tools-title">MCP toollar</h2><span class="tiny" title="Hammasi faqat o'qiydi">6 ta</span></div>
+        <ul id="tool-list" class="tools"></ul>
+        <div class="kpis">
+          <div class="kpi"><span>Bazada</span><b id="k-indicators">—</b><small>ko'rsatkich</small></div>
+          <div class="kpi"><span>Topildi</span><b id="k-found">—</b><small>qidiruvda</small></div>
+          <div class="kpi"><span>DWH</span><b id="k-rows">—</b><small>qator</small></div>
+          <div class="kpi"><span>Vaqt</span><b id="k-time">—</b><small>backend javobi</small></div>
+        </div>
+        <ul class="legend" aria-label="Sahnadagi ranglar">
+          <li><i class="dot green"></i>Ombor (DWH)</li>
+          <li><i class="dot blue"></i>Agent va toollar</li>
+          <li><i class="dot amber"></i>Natija / chaqirilgan</li>
+        </ul>
+      </aside>
+
+      <!-- Natija kartasi: sahnadagi animatsiya tugagach pastdan chiqadi -->
+      <section id="result" class="glass result" aria-labelledby="result-title" hidden>
+        <div class="r-head">
+          <div class="r-q">
+            <h2 id="result-title" class="eyebrow">Javob</h2>
+            <span id="r-question">—</span>
+          </div>
+          <div class="r-badges">
+            <span id="r-status" class="rbadge">Ishlanmoqda…</span>
+            <span id="r-latency" class="rbadge ghost" title="Backend javob bergan vaqt: savol yuborilgandan oxirgi voqeagacha">—</span>
+            <button id="r-close" type="button" class="secondary r-close" hidden aria-label="To‘liq ekranni yopish (Esc)">Yopish ✕</button>
           </div>
         </div>
 
-        <h3>Natija grafigi</h3>
-        <div id="result-chart" class="chart-box"></div>
+        <div id="r-figure" class="r-body" hidden>
+          <div>
+            <div id="r-label" class="r-label">—</div>
+            <div class="r-value"><span id="r-value">—</span><span id="r-unit" class="unit"></span></div>
+            <div class="r-delta"><span id="r-delta" class="delta"></span><span id="r-delta-cap"></span></div>
+          </div>
+          <div class="r-spark">
+            <svg id="r-spark" width="210" height="64" viewBox="0 0 210 64" preserveAspectRatio="none" role="img" aria-label="Davrlar bo'yicha o'zgarish"></svg>
+            <div id="r-spark-cap" class="spark-cap"></div>
+          </div>
+          <!-- Faqat to'liq ekranda: monitordagi ustunlar -->
+          <div id="r-bars" class="r-bars"></div>
+        </div>
+
+        <p id="answer" class="answer" aria-live="polite">Hali savol berilmagan.</p>
+        <ol id="sources" class="sources" aria-label="Manbalar"></ol>
+
+        <!-- Texnik tafsilotlar: oddiy foydalanuvchiga shovqin bo'lmasin — faqat so'ralsa ochiladi -->
+        <details class="r-more">
+          <summary>AI buni qanday topdi?</summary>
+          <div class="r-meta">
+            <div><span>MCP tool</span><b id="m-tool">—</b></div>
+            <div><span>Jadval</span><b id="m-table">—</b></div>
+            <div><span>DWH vaqti</span><b id="m-dwh">—</b></div>
+            <div><span>Tekshiruv</span><b id="m-verify">—</b></div>
+          </div>
+          <h3>7 qadam</h3>
+          <ol id="stages" class="stages"></ol>
+          <div class="grid-2">
+            <div>
+              <h3>Topilgan ko'rsatkichlar (RRF)</h3>
+              <ol id="search-results" class="search-results"></ol>
+            </div>
+            <div>
+              <h3>Tekshiruv (har bir jumla)</h3>
+              <ul id="verification" class="verification"></ul>
+            </div>
+          </div>
+          <h3>Natija grafigi</h3>
+          <div id="result-chart" class="chart-box"></div>
+        </details>
+        <button id="save-demo" type="button" class="secondary" hidden>Demo uchun saqlash (demo.json)</button>
       </section>
+
+      <!-- WebGL yo'q bo'lsa yoki ?mode=2d -->
+      <div id="scene-fallback" class="glass fallback" hidden></div>
     </main>
 
     <!-- 2-sahifa: bazada nima bor -->
     <main id="view-catalog" class="single" hidden>
-      <section class="panel">
+      <section class="glass panel">
         <h2>Bazada nima bor</h2>
         <div id="db-stats" class="stats"></div>
         <form id="catalog-form" class="row">
@@ -78,8 +175,11 @@
 
     <!-- 3-sahifa: bitta ko'rsatkich -->
     <main id="view-indicator" class="single" hidden>
-      <section id="indicator" class="panel"></section>
+      <section id="indicator" class="glass panel"></section>
     </main>
+
+    <!-- Inspektor: bosqich yoki tool bosilganda haqiqiy ma'lumot -->
+    <dialog id="inspector" class="inspector" aria-label="Inspektor"></dialog>
 
     <script type="module" src="/src/main.js"></script>
   </body>
