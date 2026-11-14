@@ -556,3 +556,58 @@ body.result-full .panel-left, body.result-full .panel-right { visibility: hidden
 .ask-layout .result.full { backdrop-filter: none; -webkit-backdrop-filter: none; contain: layout paint; }
 .ask-layout .result.pending { visibility: hidden; pointer-events: none; animation: none; }
 #r-value { font-variant-numeric: tabular-nums; }
+
+/* =========================================================
+   Savol paneli — pastda, o'rtada (qidiruv satri kabi). O'ng panel yo'q.
+   ========================================================= */
+:root { --left-w: 0px; --right-w: 0px; --dock-w: 720px; }
+@media (min-width: 901px) {
+  .ask-layout .panel-left {
+    top: auto; bottom: var(--gap); left: 50%; right: auto; transform: translateX(-50%);
+    width: min(var(--dock-w), calc(100vw - 2 * var(--gap))); max-height: none;
+    overflow: visible; gap: 10px; padding: 14px 16px;
+  }
+  .ask-layout .panel-left .sec-h { display: none; }
+  .ask-layout .panel-left .chips { margin-top: 10px; }
+  /* Tavsiyalar ro'yxati yuqoriga ochiladi */
+  .ask-layout .panel-left section { position: relative; }
+  .ask-layout .suggest-box { position: absolute; left: 0; right: 0; bottom: calc(100% + 18px); margin: 0; z-index: 5; box-shadow: 0 20px 50px -20px rgba(0, 0, 0, .8); }
+  /* Oxirgi savollar — bitta qatorda gorizontal */
+  .recent { margin-top: 10px; padding-top: 10px; }
+  .recent .sec-h { display: flex !important; margin-bottom: 6px; }
+  .recent-list { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; }
+  .recent-list li { flex: none; max-width: 280px; }
+  /* Javob kartasi (kichik holatda) savol paneli ustida */
+  .ask-layout .result:not(.full) { bottom: calc(var(--dock-h, 0px) + var(--gap)); max-height: calc(100vh - var(--dock-h, 0px) - var(--top) - 110px); }
+  .scene-info { right: var(--gap); }
+}
+/* 6 ta tool ro'yxati javob tafsilotlari ichida */
+.tools-inline { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 4px; }
+
+/* Pastki savol paneli ixcham: jarayon matni va "darhol ko'rsatish" bitta qatorda;
+   savol ishlanayotganda oxirgi savollar yashiriladi */
+@media (min-width: 901px) {
+  .ask-layout .panel-left .progress { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; margin-top: 10px; }
+  .ask-layout .panel-left .progress:not([data-state]) { display: none; }
+  .ask-layout .panel-left .progress .pbar { grid-column: 1 / -1; }
+  .ask-layout .panel-left .pipe-text { margin-top: 8px; }
+  .ask-layout .panel-left .skip { width: auto; margin-top: 8px; padding: .32rem .75rem; font-size: .72rem; }
+  body.busy .recent { display: none; }
+}
+
+/* "↑ Oxirgi javob" — javobni qayta ochish */
+.chip.reopen { border-color: rgba(56, 189, 248, .45); color: #bfeaff; background: rgba(56, 189, 248, .1); }
+
+/* 🔊/🔇 tugmasi */
+.sound-btn {
+  width: 34px; height: 34px; padding: 0; display: grid; place-items: center; font-size: .95rem;
+  border-radius: 999px; background: rgba(255, 255, 255, .03); border: 1px solid var(--stroke); box-shadow: none; color: var(--text);
+}
+.sound-btn:hover { border-color: rgba(56, 189, 248, .45); filter: none; }
+.sound-btn[aria-pressed='false'] { opacity: .6; }
+
+/* Ovoz tugmasi: belgi + qisqa yozuv */
+.sound-btn { width: auto; padding: 0 12px 0 10px; gap: 6px; display: inline-flex; align-items: center; font-size: .74rem; font-weight: 500; }
+.sound-btn .sound-label { color: var(--muted); }
+.sound-btn[aria-pressed='true'] .sound-label { color: #bfeaff; }
+@media (max-width: 600px) { .sound-btn .sound-label { display: none; } }

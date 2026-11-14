@@ -7,12 +7,13 @@ import { createInspector } from './ui/inspector.js';
 import { initCatalogView, showIndicator } from './ui/catalogView.js';
 import { isDemoMode, loadDemo } from './api/demo.js';
 import { formatNumber } from './core/format.js';
+import { sfx, initSoundToggle } from './audio/sfx.js';
 
 // Sahna butun ekranda; panellar egallagan joyni hisobga olib, kamerani
-// bo'sh joy markaziga suramiz (chap panel, o'ng panel, pastdagi natija).
+// bo'sh joy markaziga suramiz (tepada — sarlavha, pastda — savol paneli va javob kartasi).
 function watchInsets(sc) {
-  const left = document.querySelector('.panel-left');
-  const right = document.querySelector('.panel-right');
+  const left = document.querySelector('.panel-left'); // pastdagi savol paneli
+  const right = null;
   const result = document.querySelector('#result');
   const top = document.querySelector('.topbar');
   const update = () => {
@@ -21,13 +22,11 @@ function watchInsets(sc) {
     const H = window.innerHeight;
     if (W <= 900 || !document.body.classList.contains('route-ask')) { sc.setInsets(0, 0, 0, 0); return; }
     const box = (n) => (n && n.getClientRects().length ? n.getBoundingClientRect() : null);
-    const l = box(left), r = box(right), b = box(result), t = box(top);
-    sc.setInsets(
-      l ? l.right : 0,
-      r ? W - r.left : 0,
-      t ? t.bottom : 0,
-      b ? Math.min(H - b.top, H * 0.5) : 0,
-    );
+    const dock = box(left), b = box(result), t = box(top);
+    // Javob kartasi savol paneli ustida turadi
+    if (dock) document.documentElement.style.setProperty('--dock-h', `${Math.round(H - dock.top)}px`);
+    const bottomEdge = Math.min(dock ? dock.top : H, b ? b.top : H);
+    sc.setInsets(0, 0, t ? t.bottom : 0, Math.min(H - bottomEdge, H * 0.6));
   };
   const ro = new ResizeObserver(update);
   for (const n of [left, right, result, top]) if (n) ro.observe(n);
@@ -72,6 +71,10 @@ if (isDemoMode()) {
   document.body.classList.add('has-demo');
 }
 
+// Ovoz: sahna faqat "nom" bilan so'raydi, chalish shu yerda
+initSoundToggle(document.querySelector('#sound-toggle'));
+scene?.setSoundHandler?.((name, ...args) => sfx.play(name, ...args));
+
 initAskView({ scene, inspector, demo });
 const catalog = initCatalogView();
 
@@ -86,7 +89,8 @@ checkHealth().then(({ backend, database }) => {
   if (backend && database) {
     getStats().then((s) => {
       scene?.setStats(s);
-      document.querySelector('#k-indicators').textContent = formatNumber(s?.total_indicators);
+      const k = document.querySelector('#k-indicators');
+      if (k) k.textContent = formatNumber(s?.total_indicators);
     }).catch(() => scene?.setStats(null));
   } else {
     scene?.setStats(null);

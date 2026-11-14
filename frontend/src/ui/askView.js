@@ -2,6 +2,7 @@
 // Har bir voqeaning maydonlari docs/sse-contract.md da.
 // Qoida: ekrandagi har bir raqam backend voqeasidan olinadi; bo'lmasa "Mavjud emas".
 import { ask, searchIndicators } from '../api/client.js';
+import { sfx } from '../audio/sfx.js';
 import { replay, downloadRecording } from '../api/demo.js';
 import { renderStages, setStageState, setStageDetail, failActiveStages } from './stagesPanel.js';
 import { renderSeriesChart } from '../viz/seriesChart.js';
@@ -83,7 +84,7 @@ export function initAskView({ scene, inspector, demo = null }) {
   }
   scene?.setToolClickHandler?.(inspectTool);
 
-  // ---------------- O'ng panel: 6 ta tool ----------------
+  // ---------------- 6 ta tool ro'yxati ("AI buni qanday topdi?" ichida) ----------------
   const toolButtons = new Map();
   const toolList = $('#tool-list');
   for (const name of TOOLS) {
@@ -132,7 +133,8 @@ export function initAskView({ scene, inspector, demo = null }) {
   renderStages(stagesEl, inspectStage);
 
   // ---------------- Natija kartasi ----------------
-  const kpi = (id, v) => { $(id).textContent = v; };
+  // Kartochka (o'ng panel) olib tashlangan bo'lsa — jim o'tib ketadi
+  const kpi = (id, v) => { const n = $(id); if (n) n.textContent = v; };
   function setMeta(id, v) { $(id).textContent = v ?? '—'; }
 
   function showFigure(rows, unit) {
@@ -215,6 +217,7 @@ export function initAskView({ scene, inspector, demo = null }) {
     pipeText.textContent = 'Savol yuborildi…';
     setRunState('running');
     skipBtn.hidden = false;
+    reopenBtn.hidden = true;
   }
 
   function finish(state) {
@@ -248,12 +251,37 @@ export function initAskView({ scene, inspector, demo = null }) {
     if (!on) document.body.classList.remove('result-full');
     $('#r-close').hidden = !on;
   }
+  // "Yopish": javob kartasi butunlay yo'qoladi — 3D sahna to'sib qo'yilmaydi.
+  // Savol panelida "↑ Oxirgi javob" qoladi — bosilsa javob yana to'liq ekranda ochiladi.
+  const reopenBtn = $('#reopen-answer');
   function closeFull() {
     if (!resultEl.classList.contains('full')) return;
     scene?.setPaused?.(false);
     setFull(false);
+    resultEl.hidden = true;
+    reopenBtn.hidden = false;
+    sfx.play('close');
     scene?.overview?.();
   }
+  // 3D monitor ekrani bosilsa ham — xuddi "↑ Oxirgi javob" kabi
+  scene?.setMonitorClickHandler?.(() => {
+    if (reopenBtn.hidden) return false;
+    reopenBtn.click();
+    return true;
+  });
+  reopenBtn.addEventListener('click', () => {
+    reopenBtn.hidden = true;
+    setFull(true);
+    resultEl.hidden = false;
+    sfx.play('open');
+    const done = () => { document.body.classList.add('result-full'); scene?.setPaused?.(true); };
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { done(); return; }
+    resultEl.animate([
+      { opacity: 0, transform: 'scale(.97)' },
+      { opacity: 1, transform: 'scale(1)' },
+    ], { duration: 300, easing: 'cubic-bezier(.22, 1, .36, 1)' }).finished.then(done, done);
+    $('#r-close').focus({ preventScroll: true });
+  });
   $('#r-close').addEventListener('click', closeFull);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && resultEl.classList.contains('full') && !document.querySelector('dialog[open]')) closeFull();
@@ -291,6 +319,7 @@ export function initAskView({ scene, inspector, demo = null }) {
       done();
     }
     if (full) $('#r-close').focus({ preventScroll: true });
+    if (full) sfx.play('open');
     rollNumber($('#r-value'));
     if (state === 'error') {
       setRunState('error');
@@ -389,7 +418,7 @@ export function initAskView({ scene, inspector, demo = null }) {
   if (demo) {
     if (demo.rec) input.value = demo.rec.question;
     input.readOnly = true;
-    for (const chip of document.querySelectorAll('.chip')) chip.hidden = true;
+    for (const chip of document.querySelectorAll('.chip[data-q]')) chip.hidden = true;
   }
   // ---------------- 1) Animatsiyani o'tkazib yuborish ----------------
   const skipBtn = $('#skip-anim');
@@ -521,7 +550,7 @@ export function initAskView({ scene, inspector, demo = null }) {
       form.requestSubmit();
     }
   });
-  for (const chip of document.querySelectorAll('.chip')) {
+  for (const chip of document.querySelectorAll('.chip[data-q]')) {
     chip.addEventListener('click', () => {
       input.value = chip.dataset.q;
       autosize();

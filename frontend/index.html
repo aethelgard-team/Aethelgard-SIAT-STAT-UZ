@@ -36,6 +36,7 @@
         <a href="#/catalog">Bazada nima bor</a>
       </nav>
       <div class="top-right">
+        <button id="sound-toggle" type="button" class="sound-btn" aria-pressed="true">🔊</button>
         <p id="agent-state" class="agent-state" aria-live="polite">agent · kutmoqda</p>
         <p id="backend-status" class="badge">Backend: tekshirilmoqda…</p>
       </div>
@@ -64,6 +65,7 @@
             <button type="button" class="chip" data-q="2026-yil sentyabrda mol go'shtining o'rtacha narxi qancha?"><i style="--c:var(--amber)"></i>Mol go'shti narxi</button>
             <button type="button" class="chip" data-q="O'zbekiston aholisi soni qancha?"><i style="--c:var(--green)"></i>Aholi soni</button>
             <button type="button" class="chip" data-q="Toshkent shahrida tuxum narxi qancha?"><i style="--c:var(--blue)"></i>Tuxum narxi</button>
+            <button type="button" id="reopen-answer" class="chip reopen" hidden>↑ Oxirgi javob</button>
           </div>
           <!-- Savol ishlanayotganda bitta ingichka chiziq (bosqichlar ro'yxati emas) -->
           <div class="progress" aria-live="polite">
@@ -80,21 +82,6 @@
         </section>
       </aside>
 
-      <aside class="glass panel panel-right" aria-labelledby="tools-title">
-        <div class="sec-h"><h2 id="tools-title">MCP toollar</h2><span class="tiny" title="Hammasi faqat o'qiydi">6 ta</span></div>
-        <ul id="tool-list" class="tools"></ul>
-        <div class="kpis">
-          <div class="kpi"><span>Bazada</span><b id="k-indicators">—</b><small>ko'rsatkich</small></div>
-          <div class="kpi"><span>Topildi</span><b id="k-found">—</b><small>qidiruvda</small></div>
-          <div class="kpi"><span>DWH</span><b id="k-rows">—</b><small>qator</small></div>
-          <div class="kpi"><span>Vaqt</span><b id="k-time">—</b><small>backend javobi</small></div>
-        </div>
-        <ul class="legend" aria-label="Sahnadagi ranglar">
-          <li><i class="dot green"></i>Ombor (DWH)</li>
-          <li><i class="dot blue"></i>Agent va toollar</li>
-          <li><i class="dot amber"></i>Natija / chaqirilgan</li>
-        </ul>
-      </aside>
 
       <!-- Natija kartasi: sahnadagi animatsiya tugagach pastdan chiqadi -->
       <section id="result" class="glass result" aria-labelledby="result-title" hidden>
@@ -138,6 +125,8 @@
           </div>
           <h3>7 qadam</h3>
           <ol id="stages" class="stages"></ol>
+          <h3>MCP toollar (bosilsa — chaqiruv ma'lumoti)</h3>
+          <ul id="tool-list" class="tools tools-inline"></ul>
           <div class="grid-2">
             <div>
               <h3>Topilgan ko'rsatkichlar (RRF)</h3>

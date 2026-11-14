@@ -6,6 +6,9 @@
 // Har bir yorliq va bosiladigan joy — 3D nuqtaga bog'langan HTML tugma.
 import * as THREE from 'three';
 import { gsap } from 'gsap';
+// Animatsiyalar haqiqiy vaqtga ergashsin: sekin kompyuterda GSAP o'z soatini sekinlashtirmasin,
+// aks holda sahna qadamlari (setTimeout) va animatsiyalar bir-biridan ajralib qoladi
+gsap.ticker.lagSmoothing(0);
 import { TOOLS } from '../core/stages.js';
 import { formatNumber, el } from '../core/format.js';
 import { createWarehouse } from './warehouse.js';
@@ -30,7 +33,7 @@ const NODE_IDLE = 0x1e2a40;
 const BG = 0x060a12;
 
 const SIDE_X = 6;          // ombor va ustunlar markazdan shuncha uzoqda
-const HALF_WIDTH = 8.4;    // sahna kengligining yarmi (kamera shunga moslanadi)
+const HALF_WIDTH = 9.4;    // sahna kengligining yarmi (kamera shunga moslanadi)
 const HALF_HEIGHT = 3.0;   // sahna balandligining yarmi
 const AGENT_Y = 2.0;
 const RING_R = 2.6;
@@ -209,8 +212,35 @@ export function createAgentScene(container, labelsEl, infoEl) {
       if (visible) {
         const half = l.node.offsetWidth / 2 + 8;
         const x = Math.min(Math.max(((tmp.x + 1) / 2) * w, half), w - half);
-        l.node.style.transform = `translate(${x.toFixed(1)}px, ${(((1 - tmp.y) / 2) * h).toFixed(1)}px) translate(-50%, -100%)`;
+        const y = ((1 - tmp.y) / 2) * h;
+        l.node.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+        l.x = x;
+        l.y = y;
       }
+    }
+    hideOverlaps();
+  }
+
+  // Yozuvlar ustma-ust tushmasin: tegsa, kamroq muhimi yashiriladi.
+  // Muhimlik: sarlavhalar (Ombor, Natija, AI agent) > chaqirilgan tool > qolgan toollar.
+  // Ustun tugmalari (ko'rinmas, faqat bosish uchun) hisobga olinmaydi.
+  const prio = (l) => {
+    if (l.node.classList.contains('scene-title')) return l.node.dataset.active === 'true' ? 5 : 4;
+    if (l.node.dataset.called === 'true' || l.node.dataset.active === 'true') return 3;
+    return 1;
+  };
+  let overlapTick = 0;
+  function hideOverlaps() {
+    if (++overlapTick % 3) return; // har 3-kadrda — yengil
+    const placed = [];
+    const list = labels.filter((l) => l.kind !== 'bar' && !l.node.hidden && l.x !== undefined)
+      .sort((a, b) => prio(b) - prio(a));
+    for (const l of list) {
+      const wd = l.node.offsetWidth, ht = l.node.offsetHeight;
+      const r = { x0: l.x - wd / 2 - 4, x1: l.x + wd / 2 + 4, y0: l.y - ht - 2, y1: l.y + 2 };
+      const hit = placed.some((q) => r.x0 < q.x1 && r.x1 > q.x0 && r.y0 < q.y1 && r.y1 > q.y0);
+      l.node.style.visibility = hit ? 'hidden' : '';
+      if (!hit) placed.push(r);
     }
   }
 
@@ -331,8 +361,11 @@ export function createAgentScene(container, labelsEl, infoEl) {
   globe.add(new THREE.Mesh(new THREE.SphereGeometry(GLOBE_R * 1.12, 64, 48), atmMat));
   const globeState = { fade: 1, spin: true };
   // Birinchi savoldan keyin: globus yo'q, xarita tayyor turadi (2-savolda qayta ochilish animatsiyasi yo'q)
+  let modeTl = null; // globus <-> xarita o'tishi (bitta zanjir — to'liq to'xtatish oson)
   function ensureMap() {
     if (mode === 'idle') return;
+    modeTl?.kill();
+    modeTl = null;
     gsap.killTweensOf([globeState, globe.scale, map.scale, globeSpin.rotation]);
     globeState.spin = false;
     globeState.fade = 0;
@@ -547,19 +580,19 @@ export function createAgentScene(container, labelsEl, infoEl) {
   const cam = { x: target.x, y: target.y, z: target.z, zoom: 1 };
   const boost = { agent: 1, warehouse: 1, bars: 1 };
   const CAM = {
-    agent: [0, AGENT_Y, 0, 0.8],
-    warehouse: [-SIDE_X, 0.6, 0, 0.75],
-    tool: [0, AGENT_Y, 0, 0.8],
-    bars: [SIDE_X, 1.4, 0, 0.75],
+    agent: [0, AGENT_Y, 0, 0.92],
+    warehouse: [-SIDE_X, 0.6, 0, 0.88],
+    tool: [0, AGENT_Y, 0, 0.92],
+    bars: [SIDE_X, 1.4, 0, 0.88],
   };
   const MODE_CAM = {
-    idle: [0, AGENT_Y, 0, 0.6],          // aylanuvchi Yer shari
-    compose: [0, AGENT_Y, 0, 0.42],      // faqat O'zbekiston xaritasi, yaqindan
+    idle: [0, AGENT_Y, 0, 0.78],          // aylanuvchi Yer shari
+    compose: [0, AGENT_Y, 0, 0.64],      // faqat O'zbekiston xaritasi, yaqindan
     active: [target.x, target.y, target.z, 1], // hammasi
   };
-  function flyTo(name) {
+  function flyTo(name, dur = 0.8) {
     const [x, y, z, zoom] = name ? CAM[name] : MODE_CAM[mode];
-    gsap.to(cam, { x, y, z, zoom, duration: reduceMotion ? 0 : 0.8, ease: 'power2.inOut', overwrite: true });
+    gsap.to(cam, { x, y, z, zoom, duration: reduceMotion ? 0 : dur, ease: 'power2.inOut', overwrite: true });
     const zone = name === 'tool' ? 'agent' : name;
     for (const k of Object.keys(boost)) {
       gsap.to(boost, { [k]: k === zone && !reduceMotion ? 7 : 1, duration: 0.8 });
@@ -573,7 +606,7 @@ export function createAgentScene(container, labelsEl, infoEl) {
   const _p = new THREE.Vector3();
   const SEG = 64;
   // fadeOut: true — nur yetib borgach butunlay yo'qoladi (iz qolmaydi)
-  function createBeam(fromFn, toFn, color, lift = 1.5, { fadeOut = false } = {}) {
+  function createBeam(fromFn, toFn, color, lift = 1.5, { fadeOut = false, duration = 0.6, ease = 'power2.inOut' } = {}) {
     const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3());
     const g = new THREE.Group();
     scene.add(g);
@@ -607,7 +640,7 @@ export function createAgentScene(container, labelsEl, infoEl) {
       mats: [coreM, haloM, pm, head.material],
     };
     beams.push(b);
-    if (!reduceMotion) gsap.to(b, { progress: 1, duration: 0.6, ease: 'power2.inOut' });
+    if (!reduceMotion) gsap.to(b, { progress: 1, duration, ease });
     if (fadeOut) {
       gsap.to(b.mats, { opacity: 0, duration: 0.6, delay: 0.9 });
       return b;
@@ -696,8 +729,9 @@ export function createAgentScene(container, labelsEl, infoEl) {
     tool: { pos: () => (activeTool && toolPos(activeTool)) || agentPos(), size: 0.6 },
     bars: { pos: () => new THREE.Vector3(SIDE_X, 0, 0), size: 2.6 },
   };
-  function setFocus(name) {
-    flyTo(name);
+  // fly=false — faqat halqa va yorliq ko'chadi, kamera joyida qoladi
+  function setFocus(name, fly = true) {
+    if (fly) flyTo(name);
     activeLabel?.removeAttribute('data-active');
     activeLabel = null;
     if (!name) {
@@ -811,6 +845,24 @@ export function createAgentScene(container, labelsEl, infoEl) {
     camera.updateProjectionMatrix();
   }
   new ResizeObserver(resize).observe(container);
+
+  let sound = () => {}; // ovoz so'rovi (main.js beradi)
+
+  // Monitor ekrani bosilsa — oxirgi javob yana to'liq ekranda ochiladi (askView beradi)
+  let onMonitorClick = null;
+  const ray = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  function hitsMonitor(e) {
+    if (!onMonitorClick || !barsZone.visible || !bars.hasData()) return false;
+    const r = renderer.domElement.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    return ray.intersectObject(bars.screen, false).length > 0;
+  }
+  renderer.domElement.addEventListener('click', (e) => { if (hitsMonitor(e)) onMonitorClick(); });
+  renderer.domElement.addEventListener('pointermove', (e) => {
+    renderer.domElement.style.cursor = hitsMonitor(e) ? 'pointer' : '';
+  });
   resize();
 
   const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
@@ -915,15 +967,18 @@ export function createAgentScene(container, labelsEl, infoEl) {
       showZone('tools', m === 'active', instant);
       showZone('bars', m === 'active', instant);
       const fast = instant || reduceMotion;
+      modeTl?.kill();
+      modeTl = null;
       gsap.killTweensOf([globeState, map.scale, globeSpin.rotation, globe.scale]);
       if (m === 'idle') {
         // Xarita yo'qoladi, globus qaytib aylana boshlaydi
         globeState.spin = true;
         if (fast) { map.scale.setScalar(0.001); map.visible = false; globeState.fade = 1; globe.scale.setScalar(1); applyGlobeFade(); }
         else {
-          gsap.to(map.scale, { x: 0.001, y: 0.001, z: 0.001, duration: 0.5, ease: 'power2.in', onComplete: () => { if (mode === 'idle') map.visible = false; } });
-          gsap.to(globe.scale, { x: 1, y: 1, z: 1, duration: 0.9, ease: 'power2.out' });
-          gsap.to(globeState, { fade: 1, duration: 0.8, delay: 0.2, onUpdate: applyGlobeFade });
+          modeTl = gsap.timeline()
+            .to(map.scale, { x: 0.001, y: 0.001, z: 0.001, duration: 0.5, ease: 'power2.in', onComplete: () => { if (mode === 'idle') map.visible = false; } }, 0)
+            .to(globe.scale, { x: 1, y: 1, z: 1, duration: 0.9, ease: 'power2.out' }, 0)
+            .to(globeState, { fade: 1, duration: 0.8, onUpdate: applyGlobeFade }, 0.2);
         }
       } else if (prev === 'idle' || instant) {
         // Globus O'zbekistonga buriladi, kattalashib "ichiga kiriladi", xarita ochiladi
@@ -931,13 +986,16 @@ export function createAgentScene(container, labelsEl, infoEl) {
         map.visible = true;
         if (fast) { globeState.fade = 0; applyGlobeFade(); map.scale.setScalar(1.25); }
         else {
+          sound('compose');
           const cur = globeSpin.rotation.y;
           const want = THREE.MathUtils.degToRad(-64);
           const turn = want + Math.round((cur - want) / (Math.PI * 2)) * Math.PI * 2;
-          gsap.to(globeSpin.rotation, { y: turn, x: THREE.MathUtils.degToRad(41), duration: 0.8, ease: 'power2.inOut' });
-          gsap.to(globe.scale, { x: 2.4, y: 2.4, z: 2.4, duration: 0.8, delay: 0.6, ease: 'power2.in' });
-          gsap.to(globeState, { fade: 0, duration: 0.55, delay: 0.85, onUpdate: applyGlobeFade });
-          gsap.fromTo(map.scale, { x: 0.3, y: 0.3, z: 0.3 }, { x: 1.25, y: 1.25, z: 1.25, duration: 0.9, delay: 0.9, ease: 'back.out(1.4)' });
+          map.scale.setScalar(0.001);
+          modeTl = gsap.timeline()
+            .to(globeSpin.rotation, { y: turn, x: THREE.MathUtils.degToRad(41), duration: 0.8, ease: 'power2.inOut' }, 0)
+            .to(globe.scale, { x: 2.4, y: 2.4, z: 2.4, duration: 0.8, ease: 'power2.in' }, 0.6)
+            .to(globeState, { fade: 0, duration: 0.55, onUpdate: applyGlobeFade }, 0.85)
+            .fromTo(map.scale, { x: 0.3, y: 0.3, z: 0.3 }, { x: 1.25, y: 1.25, z: 1.25, duration: 0.9, ease: 'back.out(1.4)', immediateRender: false }, 0.9);
         }
       }
       if (!focusOn) flyTo(null);
@@ -974,10 +1032,16 @@ export function createAgentScene(container, labelsEl, infoEl) {
     // Tool yorlig'i bosilganda chaqiriladi: fn(toolNomi, tugma)
     setToolClickHandler(fn) { onToolClick = fn; },
 
+    // Ovoz: sahna o'zi chalmaydi, faqat nomini aytadi (main.js chaladi)
+    setSoundHandler(fn) { sound = fn; },
+
+    // Monitor ekrani bosilganda chaqiriladi
+    setMonitorClickHandler(fn) { onMonitorClick = fn; },
+
     // Bosqich holati (askView har bir haqiqiy voqeada chaqiradi)
     stage(id, state) {
       if (id === 'parse' && state === 'active') {
-        step(() => { setScanning(true); setFocus('agent'); pulse(0.6); shockwave(agentPos(), BLUE, 2.6); floorWave(); }, 800);
+        step(() => { sound('start'); setScanning(true); setFocus('agent'); pulse(0.6); shockwave(agentPos(), BLUE, 2.6); floorWave(); }, 800);
       }
       if (id === 'search' && state === 'active') {
         // Katalogdan qidirish: kamera agentda qoladi (omborga faqat bir marta — o'qishda boriladi)
@@ -986,12 +1050,17 @@ export function createAgentScene(container, labelsEl, infoEl) {
       if (id === 'dwh' && state === 'done') {
         // Tool ombordan o'qidi: ombor -> tool nuri
         step(() => {
-          setFocus('warehouse');
+          // Ombordan monitorgacha kamera sakramaydi: bir marta umumiy ko'rinishga silliq chiqadi,
+          // ma'lumot esa chiziq bo'lib bir tekis yuradi (ombor -> tool -> agent -> monitor)
+          setFocus('warehouse', false);
+          flyTo(null, 1.2);
           gsap.fromTo(floorMat.uniforms.uWhGlow, { value: 1 }, { value: 0.15, duration: 1.6 });
           warehouse.wave();
+          sound('warehouse');
+          sound('beam', 0.9);
           gsap.fromTo(whLight, { intensity: 6 }, { intensity: 22, duration: 0.35, yoyo: true, repeat: 3 });
-          createBeam(whPos, () => (activeTool && toolPos(activeTool)) || agentPos(), GREEN, 2.2);
-        }, 800);
+          createBeam(whPos, () => (activeTool && toolPos(activeTool)) || agentPos(), GREEN, 2.2, { duration: 0.9, ease: 'none' });
+        }, 950);
       }
       if (id === 'generate' && state === 'active') {
         // Kamera natija (monitor)da qoladi — javob shu yerdan chiqadi; agent faqat pulslaydi
@@ -1011,12 +1080,14 @@ export function createAgentScene(container, labelsEl, infoEl) {
             coreMat.uniforms.uColA.value.set(RED);
             edgeMat.color.set(RED);
             shockwave(agentPos(), RED, 3.6);
+            sound('error');
           } else {
             // Kamera monitor ekraniga sho'ng'iydi (avval sekin, keyin tez);
             // shundan keyin javob shu ekrandan butun ekranga ochiladi
             pulse(1);
             setFocus(null);
             diveToMonitor();
+            sound('dive');
           }
         }, state === 'error' ? 0 : 800);
       }
@@ -1043,6 +1114,7 @@ export function createAgentScene(container, labelsEl, infoEl) {
         setFocus('tool');
         pulse(0.7);
         createBeam(agentPos, () => toolPos(name), BLUE, 0.8);
+        sound('tool');
       }, 800);
     },
 
@@ -1080,11 +1152,12 @@ export function createAgentScene(container, labelsEl, infoEl) {
     showBars(rows, { unit = '', sourceUrl = '' } = {}) {
       // Raqamlar tooldan agentga qaytadi (kamera agentda — toolga qayta bormaymiz)
       step(() => {
-        setFocus('agent');
+        setFocus('agent', false);
         const from = () => (activeTool && toolPos(activeTool)) || agentPos();
-        createBeam(from, agentPos, AMBER, 0.6);
-        setTimeout(() => pulse(0.8), reduceMotion ? 0 : 300);
-      }, 300);
+        createBeam(from, agentPos, AMBER, 0.6, { duration: 0.9, ease: 'none' });
+        sound('beam', 0.9);
+        setTimeout(() => pulse(0.8), reduceMotion ? 0 : 900);
+      }, 950);
       step(() => {
         removeLabels('bar');
         hideInfo();
@@ -1102,16 +1175,20 @@ export function createAgentScene(container, labelsEl, infoEl) {
           btn.type = 'button';
           btn.setAttribute('aria-label', `${it.row.period_key}: ${formatNumber(it.row.value)} ${unit}`);
           btn.title = `${it.row.period_key}: ${formatNumber(it.row.value)}`;
-          btn.addEventListener('click', () => { bars.select(it); showInfo(it.row, unit, sourceUrl); });
+          // Javob tayyor bo'lsa — ekranni bosish javobni ochadi; aks holda shu oy ma'lumoti
+          btn.addEventListener('click', () => { if (!onMonitorClick?.()) { bars.select(it); showInfo(it.row, unit, sourceUrl); } });
           btn.addEventListener('focus', () => bars.select(it));
           addLabel(anchor, btn, { kind: 'bar' });
         }
-        setFocus('bars');
+        setFocus('bars', false);
         if (items.length) {
           // Nur monitor ramkasining yuqori chetiga tegadi va yo'qoladi — ekranni kesib o'tmaydi
           barsZone.updateMatrixWorld(true);
           barsTop = bars.group.localToWorld(bars.edgeTop());
-          createBeam(agentPos, barsPos, AMBER, 1.2, { fadeOut: true });
+          createBeam(agentPos, barsPos, AMBER, 1.2, { fadeOut: true, duration: 0.9, ease: 'none' });
+          sound('beam', 0.9);
+          sound('digits', 0.9);
+          setTimeout(() => sound('settle'), reduceMotion ? 0 : 900);
           if (!reduceMotion) {
             items.forEach((it, i) => {
               if (it.mesh) gsap.from(it.mesh.scale, { y: 0.001, duration: 0.6, delay: 0.3 + i * 0.04, ease: 'power3.out' });
@@ -1119,7 +1196,7 @@ export function createAgentScene(container, labelsEl, infoEl) {
           }
           shockwave(barsTop, AMBER, 2.4);
         }
-      }, 800);
+      }, 950);
     },
 
     // Yangi savol — hammasini boshlang'ich holatga qaytarish

@@ -317,5 +317,5 @@ export function createBars() {
     (x * SCREEN_W) / 2, SCREEN_Y + (y * SCREEN_H) / 2, 0,
   ));
 
-  return { group, build, clear, select, scan, edgeTop, screenCorners };
+  return { group, build, clear, select, scan, edgeTop, screenCorners, screen, hasData: () => series.length > 0 };
 }
