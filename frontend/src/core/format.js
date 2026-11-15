@@ -15,3 +15,14 @@ export function el(tag, text, className) {
   if (className) node.className = className;
   return node;
 }
+
+// Qatordagi davr (backend `period_key` beradi; bo'lmasa — bo'sh, "undefined" emas)
+export function periodOf(row) {
+  const v = row?.period_key ?? row?.period ?? '';
+  return v === null || v === undefined ? '' : String(v);
+}
+
+// Faqat to'ldirilgan qismlarni " · " bilan qo'shadi: undefined, null, '' tashlab yuboriladi
+export function joinParts(...parts) {
+  return parts.filter((x) => x !== undefined && x !== null && String(x).trim() !== '' && String(x) !== 'undefined').join(' · ');
+}

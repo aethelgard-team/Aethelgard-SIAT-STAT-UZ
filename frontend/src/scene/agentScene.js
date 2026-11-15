@@ -10,7 +10,7 @@ import { gsap } from 'gsap';
 // aks holda sahna qadamlari (setTimeout) va animatsiyalar bir-biridan ajralib qoladi
 gsap.ticker.lagSmoothing(0);
 import { TOOLS } from '../core/stages.js';
-import { formatNumber, el } from '../core/format.js';
+import { formatNumber, el, periodOf, joinParts } from '../core/format.js';
 import { createWarehouse } from './warehouse.js';
 import { createBars } from './bars3d.js';
 import { UZ_OUTLINE } from './uzbekistan.js';
@@ -799,7 +799,7 @@ export function createAgentScene(container, labelsEl, infoEl) {
   function showInfo(row, unit, sourceUrl) {
     infoEl.replaceChildren(
       el('strong', `${formatNumber(row.value)}${unit ? ` ${unit}` : ''}`),
-      el('span', `${row.item_name ?? row.item_code} · ${row.period_key}`),
+      el('span', joinParts(row.item_name, periodOf(row))),
       el('span', `status: ${row.status ?? '—'}${row.snapshot_date ? ` · snapshot: ${row.snapshot_date}` : ''}`),
     );
     const url = row.source_url || sourceUrl;
@@ -925,7 +925,7 @@ export function createAgentScene(container, labelsEl, infoEl) {
     const dist = (fitDist + camBase.dist - 22) * cam.zoom;
     camera.position.set(
       cam.x + mouse.x * 0.8,
-      cam.y + dist * 0.36 + 0.8 + camBase.lift - mouse.y * 0.4,
+      cam.y + dist * 0.29 + 0.6 + camBase.lift - mouse.y * 0.4, // ~20% pastroq rakurs — obyektlar hajmliroq
       cam.z + dist,
     );
     camera.lookAt(cam.x, cam.y, cam.z);
@@ -1149,7 +1149,7 @@ export function createAgentScene(container, labelsEl, infoEl) {
     },
 
     // tool.result: tool -> agent (raqamlar agentga qaytadi), keyin agent -> natija ustunlari
-    showBars(rows, { unit = '', sourceUrl = '' } = {}) {
+    showBars(rows, { unit = '', sourceUrl = '', title = '' } = {}) {
       // Raqamlar tooldan agentga qaytadi (kamera agentda — toolga qayta bormaymiz)
       step(() => {
         setFocus('agent', false);
@@ -1161,9 +1161,9 @@ export function createAgentScene(container, labelsEl, infoEl) {
       step(() => {
         removeLabels('bar');
         hideInfo();
-        const items = bars.build(rows, { unit });
+        const items = bars.build(rows, { unit, title });
         barsTitle.textContent = items.length
-          ? `Natija · ${items[0].row.item_name ?? items[0].row.item_code} · ${items.length} davr · past = arzon`
+          ? joinParts('Natija', items[0].row.item_name || title, `${items.length} davr`, 'past = arzon')
           : 'Natija: mavjud emas';
         let maxY = 1.5;
         for (const it of items) {
@@ -1173,8 +1173,8 @@ export function createAgentScene(container, labelsEl, infoEl) {
           bars.group.add(anchor);
           const btn = el('button', '', 'bar-label');
           btn.type = 'button';
-          btn.setAttribute('aria-label', `${it.row.period_key}: ${formatNumber(it.row.value)} ${unit}`);
-          btn.title = `${it.row.period_key}: ${formatNumber(it.row.value)}`;
+          btn.setAttribute('aria-label', joinParts(periodOf(it.row), `${formatNumber(it.row.value)} ${unit}`.trim()));
+          btn.title = joinParts(periodOf(it.row), formatNumber(it.row.value));
           // Javob tayyor bo'lsa — ekranni bosish javobni ochadi; aks holda shu oy ma'lumoti
           btn.addEventListener('click', () => { if (!onMonitorClick?.()) { bars.select(it); showInfo(it.row, unit, sourceUrl); } });
           btn.addEventListener('focus', () => bars.select(it));

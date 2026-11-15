@@ -7,7 +7,7 @@
 // bu raqamlar ma'lumot emas); natija kelganda raqamlar chapdan o'ngga bittalab to'xtaydi.
 import * as THREE from 'three';
 import { gsap } from 'gsap';
-import { formatNumber } from '../core/format.js';
+import { formatNumber, periodOf } from '../core/format.js';
 
 const MAX_BARS = 24;
 const SCREEN_W = 4.0, SCREEN_H = 2.25; // 16:9
@@ -116,7 +116,7 @@ export function createBars() {
     // Sarlavha
     g.fillStyle = '#9fb3cc';
     g.font = '600 26px Inter, system-ui, sans-serif';
-    g.fillText(meta.title || (sel.item_name ?? sel.item_code ?? ''), 48, 58);
+    g.fillText(meta.title || sel.item_name || '', 48, 58);
     g.fillStyle = '#5b6b85';
     g.font = '500 20px Inter, system-ui, sans-serif';
     g.textAlign = 'right';
@@ -135,7 +135,7 @@ export function createBars() {
     g.fillText(meta.unit || '', 48 + bigW + 16, 150);
     g.fillStyle = PICK;
     g.font = '600 22px "JetBrains Mono", Consolas, monospace';
-    g.fillText(scramble(String(sel.period_key ?? ''), lock), 48, 192);
+    g.fillText(scramble(periodOf(sel), lock), 48, 192);
 
     // Grafik
     g.strokeStyle = 'rgba(255,255,255,.08)';
@@ -187,7 +187,7 @@ export function createBars() {
         g.fillStyle = isSel ? PICK : '#5b6b85';
         g.font = '500 15px "JetBrains Mono", Consolas, monospace';
         g.textAlign = 'center';
-        g.fillText(String(b.row.period_key ?? '').replace(/^20/, ''), b.cx, CHART.y1 + 24);
+        g.fillText(periodOf(b.row).replace(/^20/, ''), b.cx, CHART.y1 + 24);
         g.textAlign = 'left';
       }
     });
@@ -263,7 +263,7 @@ export function createBars() {
   }
 
   // Qaytaradi: [{ row, top: Vector3 (group ichida) }] — bosiladigan joylar uchun
-  function build(rows, { unit = '' } = {}) {
+  function build(rows, { unit = '', title = '' } = {}) {
     clearAnchors();
     picked = null;
     if (!rows?.length) {
@@ -275,9 +275,9 @@ export function createBars() {
     const firstItem = rows[0].item_code;
     series = rows
       .filter((r) => r.item_code === firstItem)
-      .sort((a, b) => String(a.period_key).localeCompare(String(b.period_key)))
+      .sort((a, b) => periodOf(a).localeCompare(periodOf(b)))
       .slice(-MAX_BARS);
-    meta = { unit, title: series[0]?.item_name ?? '' };
+    meta = { unit, title: series[0]?.item_name || title || '' };
     for (const b of layout()) {
       const top = toLocal(b.cx, CHART.y1 - b.h);
       const anchor = new THREE.Object3D();

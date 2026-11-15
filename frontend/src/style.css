@@ -611,3 +611,34 @@ body.result-full .panel-left, body.result-full .panel-right { visibility: hidden
 .sound-btn .sound-label { color: var(--muted); }
 .sound-btn[aria-pressed='true'] .sound-label { color: #bfeaff; }
 @media (max-width: 600px) { .sound-btn .sound-label { display: none; } }
+
+/* ---------- Burger tugma va yon panel (oxirgi savollar) ---------- */
+.menu-btn {
+  width: 34px; height: 34px; padding: 0; display: grid; place-items: center; border-radius: 10px;
+  background: rgba(255, 255, 255, .03); border: 1px solid var(--stroke); box-shadow: none; color: var(--text);
+}
+.menu-btn:hover, .menu-btn[aria-expanded='true'] { border-color: rgba(56, 189, 248, .45); filter: none; }
+.drawer {
+  position: fixed; z-index: 35; top: calc(var(--top) + 76px); right: var(--gap); bottom: var(--gap);
+  width: min(340px, calc(100vw - 2 * var(--gap))); padding: 18px; overflow: auto;
+  display: flex; flex-direction: column; gap: 10px;
+  animation: drawer-in .28s cubic-bezier(.22, 1, .36, 1);
+}
+@keyframes drawer-in { from { transform: translateX(24px); opacity: 0; } }
+.drawer .recent-list { display: grid; gap: 6px; overflow: visible; }
+.drawer .recent-list li { max-width: none; }
+.drawer .recent-item { white-space: normal; line-height: 1.4; }
+.recent-empty { margin: 0; font-size: .8rem; }
+.recent-clear { align-self: flex-start; margin-top: 4px; }
+
+/* ---------- Telemetriya: yig'ilgan; "Tayyor · … s ▾" bosilsa ochiladi ---------- */
+.tele-toggle {
+  background: none; border: 0; box-shadow: none; padding: 0; margin-top: 8px; text-align: left;
+  font: inherit; font-size: .8rem; color: var(--muted); cursor: pointer;
+}
+.tele-toggle:hover { color: var(--text); filter: none; }
+.tele-toggle:empty { display: none; }
+.tele-toggle::after { content: ' ▾'; color: var(--dim); }
+.tele-toggle[aria-expanded='true']::after { content: ' ▴'; }
+.kpis.tele { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 10px; }
+@media (max-width: 600px) { .kpis.tele { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

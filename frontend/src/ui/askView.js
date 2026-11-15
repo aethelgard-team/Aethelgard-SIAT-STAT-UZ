@@ -6,7 +6,7 @@ import { sfx } from '../audio/sfx.js';
 import { replay, downloadRecording } from '../api/demo.js';
 import { renderStages, setStageState, setStageDetail, failActiveStages } from './stagesPanel.js';
 import { renderSeriesChart } from '../viz/seriesChart.js';
-import { formatNumber, el } from '../core/format.js';
+import { formatNumber, el, periodOf, joinParts } from '../core/format.js';
 import { STAGES, TOOLS } from '../core/stages.js';
 
 // Qaysi voqea qaysi bosqichga tegishli (inspektor uchun)
@@ -137,20 +137,21 @@ export function initAskView({ scene, inspector, demo = null }) {
   const kpi = (id, v) => { const n = $(id); if (n) n.textContent = v; };
   function setMeta(id, v) { $(id).textContent = v ?? '—'; }
 
-  function showFigure(rows, unit) {
+  function showFigure(rows, unit, indicatorName = '') {
     const fig = $('#r-figure');
     const valid = rows.filter((r) => r.value !== null && r.value !== undefined && !Number.isNaN(Number(r.value)));
     if (!valid.length) { fig.hidden = true; return; }
 
     // Asosiy raqam: savoldagi davr va mahsulot; topilmasa — eng oxirgi davr
-    const sorted = [...valid].sort((a, b) => String(a.period_key).localeCompare(String(b.period_key)));
-    const main = sorted.find((r) => r.period_key === parsed.detected_period
+    const sorted = [...valid].sort((a, b) => periodOf(a).localeCompare(periodOf(b)));
+    const main = sorted.find((r) => periodOf(r) && periodOf(r) === parsed.detected_period
       && (!parsed.detected_item_code || r.item_code === parsed.detected_item_code))
       ?? sorted.findLast((r) => !parsed.detected_item_code || r.item_code === parsed.detected_item_code)
       ?? sorted.at(-1);
     const series = sorted.filter((r) => r.item_code === main.item_code);
 
-    $('#r-label').textContent = `${main.item_name ?? main.item_code ?? ''} · ${main.period_key}`;
+    // Faqat bor maydonlar: nom (bo'lmasa ko'rsatkich nomi) va davr; texnik kod va "undefined" chiqmaydi
+    $('#r-label').textContent = joinParts(main.item_name || indicatorName, periodOf(main));
     $('#r-value').textContent = formatNumber(Number(main.value));
     $('#r-unit').textContent = unit || '';
 
@@ -163,7 +164,7 @@ export function initAskView({ scene, inspector, demo = null }) {
       const pct = ((Number(main.value) - Number(prev.value)) / Math.abs(Number(prev.value))) * 100;
       deltaEl.className = `delta ${pct > 0.05 ? 'up' : pct < -0.05 ? 'down' : 'flat'}`;
       deltaEl.textContent = `${pct > 0 ? '▲' : pct < 0 ? '▼' : '•'} ${Math.abs(pct).toFixed(1).replace('.', ',')}%`;
-      capEl.textContent = `${prev.period_key} ga nisbatan`;
+      capEl.textContent = periodOf(prev) ? `${periodOf(prev)} ga nisbatan` : 'oldingi davrga nisbatan';
     } else {
       deltaEl.textContent = '';
       capEl.textContent = '';
@@ -173,10 +174,10 @@ export function initAskView({ scene, inspector, demo = null }) {
     // To'liq ekran uchun: monitordagi kabi ustunlar (qiymatsiz oylar ham — "yo'q")
     const allRows = rows
       .filter((r) => r.item_code === main.item_code)
-      .sort((a, b) => String(a.period_key).localeCompare(String(b.period_key)));
+      .sort((a, b) => periodOf(a).localeCompare(periodOf(b)));
     drawBars($('#r-bars'), allRows, main, unit);
     $('#r-spark-cap').textContent = series.length > 1
-      ? `${series[0].period_key} — ${series.at(-1).period_key} · ${series.length} davr`
+      ? joinParts(periodOf(series[0]) && periodOf(series.at(-1)) ? `${periodOf(series[0])} — ${periodOf(series.at(-1))}` : '', `${series.length} davr`)
       : '';
     fig.hidden = false;
   }
@@ -377,10 +378,10 @@ export function initAskView({ scene, inspector, demo = null }) {
         stage('result', 'done');
         const rows = d.data ?? [];
         setStageDetail(stagesEl, 'result', `${rows.length} qator · ${d.execution_ms} ms`);
-        const opts = { unit: d.unit ?? '', sourceUrl: rows[0]?.source_url ?? '' };
+        const opts = { unit: d.unit ?? '', sourceUrl: rows[0]?.source_url ?? '', title: d.indicator_name ?? '' };
         renderSeriesChart(chartEl, rows, opts);
         scene?.showBars(rows, opts);
-        showFigure(rows, d.unit ?? '');
+        showFigure(rows, d.unit ?? '', d.indicator_name ?? '');
         if (!tableName && $('#m-table').textContent === '—') setMeta('#m-table', d.indicator_name);
         break;
       }
@@ -493,8 +494,35 @@ export function initAskView({ scene, inspector, demo = null }) {
 
   // ---------------- 3) Oxirgi savollar (localStorage, faqat shu brauzerda) ----------------
   const RECENT_KEY = 'aethelgard.recent';
-  const recentBox = $('#recent');
   const recentList = $('#recent-list');
+  // Yon panel (burger): ochish/yopish, Esc, tashqariga bosish
+  const drawer = $('#drawer');
+  const menuBtn = $('#menu-btn');
+  function openDrawer() {
+    drawer.hidden = false;
+    menuBtn.setAttribute('aria-expanded', 'true');
+    (recentList.querySelector('button') || $('#drawer-close')).focus({ preventScroll: true });
+  }
+  function closeDrawer(returnFocus = true) {
+    if (drawer.hidden) return;
+    drawer.hidden = true;
+    menuBtn.setAttribute('aria-expanded', 'false');
+    if (returnFocus) menuBtn.focus({ preventScroll: true });
+  }
+  menuBtn.addEventListener('click', () => (drawer.hidden ? openDrawer() : closeDrawer()));
+  $('#drawer-close').addEventListener('click', () => closeDrawer());
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !drawer.hidden) closeDrawer(); });
+  document.addEventListener('pointerdown', (e) => {
+    if (!drawer.hidden && !drawer.contains(e.target) && !menuBtn.contains(e.target)) closeDrawer(false);
+  });
+  if (demo) menuBtn.hidden = true;
+
+  // Telemetriya: "Tayyor · … s ▾" bosilsa ochiladi
+  const tele = $('#telemetry');
+  pipeText.addEventListener('click', () => {
+    tele.hidden = !tele.hidden;
+    pipeText.setAttribute('aria-expanded', String(!tele.hidden));
+  });
   const loadRecent = () => {
     try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]').filter((x) => typeof x === 'string'); } catch { return []; }
   };
@@ -506,12 +534,13 @@ export function initAskView({ scene, inspector, demo = null }) {
       const b = el('button', q, 'recent-item');
       b.type = 'button';
       b.title = 'Shu savolni qayta berish';
-      b.addEventListener('click', () => { input.value = q; autosize?.(); form.requestSubmit(); });
+      b.addEventListener('click', () => { closeDrawer(false); input.value = q; autosize?.(); form.requestSubmit(); });
       const li = el('li');
       li.append(b);
       recentList.append(li);
     }
-    recentBox.hidden = demo !== null || !items.length;
+    $('#recent-empty').hidden = items.length > 0;
+    $('#recent-clear').hidden = !items.length;
   }
   function rememberQuestion(q) {
     if (demo) return;
@@ -653,8 +682,8 @@ function drawBars(box, rows, main, unit) {
     const col = el('span', '', 'bar-col');
     col.style.setProperty('--h', has ? `${12 + k * 88}%` : '60%');
     col.style.setProperty('--k', k.toFixed(3));
-    const per = el('span', String(r.period_key ?? '').replace(/^20/, ''), 'bar-per');
-    li.title = `${r.period_key}: ${has ? `${formatNumber(v)} ${unit}` : 'bazada qiymat yo‘q'}`;
+    const per = el('span', periodOf(r).replace(/^20/, ''), 'bar-per');
+    li.title = joinParts(periodOf(r), has ? `${formatNumber(v)} ${unit}`.trim() : 'bazada qiymat yo‘q');
     li.append(val, col, per);
     list.append(li);
   }

@@ -37,6 +37,9 @@
       </nav>
       <div class="top-right">
         <button id="sound-toggle" type="button" class="sound-btn" aria-pressed="true">🔊</button>
+        <button id="menu-btn" type="button" class="menu-btn" aria-label="Oxirgi savollar" aria-expanded="false" aria-controls="drawer">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
         <p id="agent-state" class="agent-state" aria-live="polite">agent · kutmoqda</p>
         <p id="backend-status" class="badge">Backend: tekshirilmoqda…</p>
       </div>
@@ -70,14 +73,16 @@
           <!-- Savol ishlanayotganda bitta ingichka chiziq (bosqichlar ro'yxati emas) -->
           <div class="progress" aria-live="polite">
             <div class="pbar" aria-hidden="true"><i id="pipe-bar"></i></div>
-            <p id="pipe-text" class="pipe-text"></p>
+            <button id="pipe-text" type="button" class="pipe-text tele-toggle" aria-expanded="false" aria-controls="telemetry"></button>
             <span id="pipe-state" class="sr-only"></span>
             <button id="skip-anim" type="button" class="secondary skip" hidden>Javobni darhol ko'rsatish ⏭</button>
           </div>
-          <!-- Oxirgi savollar (faqat shu brauzerda saqlanadi) -->
-          <div id="recent" class="recent" hidden>
-            <div class="sec-h"><h2>Oxirgi savollar</h2><button id="recent-clear" type="button" class="link-btn">Tozalash</button></div>
-            <ul id="recent-list" class="recent-list"></ul>
+          <!-- Telemetriya: odatda yig'ilgan; "Tayyor · … s ▾" bosilsa ochiladi (raqamlar faqat backenddan) -->
+          <div id="telemetry" class="kpis tele" hidden>
+            <div class="kpi"><span>Bazada</span><b id="k-indicators">—</b><small>ko'rsatkich</small></div>
+            <div class="kpi"><span>Topildi</span><b id="k-found">—</b><small>qidiruvda</small></div>
+            <div class="kpi"><span>DWH</span><b id="k-rows">—</b><small>qator</small></div>
+            <div class="kpi"><span>Vaqt</span><b id="k-time">—</b><small>backend javobi</small></div>
           </div>
         </section>
       </aside>
@@ -166,6 +171,14 @@
     <main id="view-indicator" class="single" hidden>
       <section id="indicator" class="glass panel"></section>
     </main>
+
+    <!-- Yon panel: oxirgi savollar (burger tugma bilan ochiladi; faqat shu brauzerda saqlanadi) -->
+    <aside id="drawer" class="drawer glass" aria-labelledby="drawer-title" hidden>
+      <div class="sec-h"><h2 id="drawer-title">Oxirgi savollar</h2><button id="drawer-close" type="button" class="link-btn">Yopish ✕</button></div>
+      <p id="recent-empty" class="muted recent-empty">Hali savol berilmagan.</p>
+      <ul id="recent-list" class="recent-list"></ul>
+      <button id="recent-clear" type="button" class="link-btn recent-clear">Ro'yxatni tozalash</button>
+    </aside>
 
     <!-- Inspektor: bosqich yoki tool bosilganda haqiqiy ma'lumot -->
     <dialog id="inspector" class="inspector" aria-label="Inspektor"></dialog>
