@@ -3,7 +3,8 @@
 import { STAGES } from '../core/stages.js';
 import { el } from '../core/format.js';
 
-export function renderStages(listEl) {
+// onInspect(stageId, tugma) — "Batafsil" bosilganda (inspektor ochiladi)
+export function renderStages(listEl, onInspect) {
   listEl.replaceChildren();
   for (const stage of STAGES) {
     const li = document.createElement('li');
@@ -14,6 +15,13 @@ export function renderStages(listEl) {
       el('span', stage.question),
       el('small', '', 'detail'),
     );
+    if (onInspect) {
+      const btn = el('button', 'Batafsil', 'inspect-btn');
+      btn.type = 'button';
+      btn.setAttribute('aria-label', `${stage.title}: batafsil ma’lumot`);
+      btn.addEventListener('click', () => onInspect(stage.id, btn));
+      li.append(btn);
+    }
     listEl.append(li);
   }
 }
