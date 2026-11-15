@@ -77,8 +77,9 @@
             <span id="pipe-state" class="sr-only"></span>
             <button id="skip-anim" type="button" class="secondary skip" hidden>Javobni darhol ko'rsatish ⏭</button>
           </div>
-          <!-- Telemetriya: odatda yig'ilgan; "Tayyor · … s ▾" bosilsa ochiladi (raqamlar faqat backenddan) -->
-          <div id="telemetry" class="kpis tele" hidden>
+          <!-- Jonli telemetriya: Bazada, Topildi, DWH, Vaqt — odatda yig'ilgan;
+               "Tayyor · … s ▾" bosilsa ochiladi (raqamlar faqat backenddan) -->
+          <div id="telemetry" class="kpis tele telemetry-bar" aria-label="Telemetriya" hidden>
             <div class="kpi"><span>Bazada</span><b id="k-indicators">—</b><small>ko'rsatkich</small></div>
             <div class="kpi"><span>Topildi</span><b id="k-found">—</b><small>qidiruvda</small></div>
             <div class="kpi"><span>DWH</span><b id="k-rows">—</b><small>qator</small></div>

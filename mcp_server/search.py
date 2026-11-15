@@ -41,17 +41,38 @@ def normalize_query(query: str) -> str:
     return q.lower()
 
 
+def _stem_uz(word: str) -> str:
+    """Qidiruv uchun o'zbekcha asosiy qo'shimchalarni yengil qisqartirish."""
+    if len(word) <= 4:
+        return word
+    for suf in ("lari", "ining", "ning", "dagi", "lar", "ini", "dan", "ni", "ga", "da", "si"):
+        if word.endswith(suf) and len(word) - len(suf) >= 3:
+            return word[:-len(suf)]
+    if word.endswith("i") and len(word) >= 5 and word not in ("yalpi", "ichki", "oylik", "yillik", "ishsizlik", "aholi"):
+        return word[:-1]
+    return word
+
+
 def build_tsquery_string(normalized_query: str) -> Optional[str]:
     """To'liq matnli qidiruv uchun prefix tsquery ('word1:* & word2:*') yaratadi."""
     # Faqat harf va raqamlarni ajratib olish (lotin va kirill)
     words = re.findall(r"[a-zA-Z0-9\u0400-\u04FF]+", normalized_query)
     if not words:
         return None
-    # Har bir so'zga prefix qo'shish (kamida 2 ta harfli bo'lsa)
-    terms = [f"{w}:*" for w in words if len(w) >= 2]
+    # Har bir so'zga stem + prefix qo'shish (kamida 2 ta harfli bo'lsa)
+    terms = []
+    for w in words:
+        if len(w) >= 2:
+            stemmed = _stem_uz(w)
+            terms.append(f"{stemmed}:*")
     if not terms:
         terms = [f"{w}:*" for w in words]
-    return " & ".join(terms)
+    # Takroriy terminlarni olib tashlash
+    seen = []
+    for t in terms:
+        if t not in seen:
+            seen.append(t)
+    return " & ".join(seen)
 
 
 def rrf_hybrid_search(query: str, limit: int = 10, k: int = 60) -> List[Dict[str, Any]]:
@@ -63,14 +84,23 @@ def rrf_hybrid_search(query: str, limit: int = 10, k: int = 60) -> List[Dict[str
     if not raw_norm:
         return []
 
-    # Sinonim tekshiruvi: agar lug'atda bo'lsa, kengaytiramiz
+    # Sinonim tekshiruvi: qisqartma va so'zlashuv atamalarini almashtirish
     expanded_query = raw_norm
-    for term, syn in SYNONYMS.items():
-        if term == raw_norm:
-            expanded_query = f"{raw_norm} {syn}"
-            break
+    token_synonyms = {
+        "yaim": "yalpi ichki mahsulot",
+        "yhm": "yalpi hududiy mahsulot",
+        "inflyatsiya": "iste'mol narxlari indeksi",
+        "maosh": "ish haqi",
+    }
+    for term, syn in token_synonyms.items():
+        if re.search(rf"\b{re.escape(term)}\b", expanded_query):
+            expanded_query = re.sub(rf"\b{re.escape(term)}\b", syn, expanded_query)
+
+    if raw_norm in SYNONYMS and raw_norm == expanded_query:
+        expanded_query = SYNONYMS[raw_norm]
 
     ts_query_str = build_tsquery_string(expanded_query)
+    trgm_query = expanded_query if expanded_query != raw_norm else raw_norm
 
     scores: Dict[int, Dict[str, Any]] = {}
 
@@ -123,7 +153,7 @@ def rrf_hybrid_search(query: str, limit: int = 10, k: int = 60) -> List[Dict[str
                 WHERE similarity(dwh.normalize_text(name_uz), dwh.normalize_text(%s)) > 0.18
                 ORDER BY trgm_score DESC, indicator_id ASC
                 LIMIT 30;
-            """, (raw_norm, raw_norm))
+            """, (trgm_query, trgm_query))
             for rank, row in enumerate(cur.fetchall(), 1):
                 iid = row["indicator_id"]
                 if iid not in scores:
@@ -180,6 +210,14 @@ def rrf_hybrid_search(query: str, limit: int = 10, k: int = 60) -> List[Dict[str
                     scores[iid]["matched_items"].append(row["item_name"])
         except Exception:
             pass
+
+    # Agar foydalanuvchi jins yoki shahar/qishloq ko'rsatmagan bo'lsa, (jami) ga ustunlik berish
+    prefer_total = not any(w in raw_norm for w in ("ayol", "erkak", "shahar", "qishloq"))
+    if prefer_total:
+        for item in scores.values():
+            name_low = (item.get("name_uz") or "").lower()
+            if "(jami)" in name_low:
+                item["rrf_score"] += 0.0005
 
     # Natijalarni RRF ballari kamayish tartibida saralash
     sorted_results = sorted(
