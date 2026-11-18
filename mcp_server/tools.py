@@ -452,3 +452,132 @@ def get_available_periods(indicator_id: int) -> Dict[str, Any]:
         "period_types": period_types,
         "periods": periods
     }
+
+
+# =============================================================================
+# Bobur talablariga mos alias vositalari (Roadmap 3-kun 6 ta asosiy tool)
+# =============================================================================
+def get_indicator(indicator_id: int) -> Dict[str, Any]:
+    """get_indicator_metadata ning Bobur spetsifikatsiyasiga mos nomi."""
+    return get_indicator_metadata(indicator_id=indicator_id)
+
+
+def find_items(indicator_id: int, query: str = "") -> Dict[str, Any]:
+    """Ko'rsatkich ichidagi klassifikator (tovar, hudud) qatorlarini qidiradi."""
+    with get_db_cursor() as cur:
+        if query:
+            cur.execute("""
+                SELECT item_code, name_uz, name_ru, name_en
+                FROM dwh.dim_item
+                WHERE indicator_id = %s AND (
+                    name_uz ILIKE %s OR name_ru ILIKE %s OR item_code ILIKE %s
+                )
+                ORDER BY item_code ASC
+                LIMIT 50;
+            """, (indicator_id, f"%{query}%", f"%{query}%", f"%{query}%"))
+        else:
+            cur.execute("""
+                SELECT item_code, name_uz, name_ru, name_en
+                FROM dwh.dim_item
+                WHERE indicator_id = %s
+                ORDER BY item_code ASC
+                LIMIT 50;
+            """, (indicator_id,))
+        items = cur.fetchall()
+    return {
+        "indicator_id": indicator_id,
+        "query": query,
+        "total_found": len(items),
+        "items": [dict(r) for r in items]
+    }
+
+
+def get_series(
+    indicator_id: int,
+    item_codes: Optional[List[str]] = None,
+    from_period: Optional[str] = None,
+    to_period: Optional[str] = None,
+    limit: int = 500
+) -> Dict[str, Any]:
+    """get_data ning Bobur spetsifikatsiyasiga mos nomi."""
+    periods = None
+    if from_period and to_period:
+        avail = get_available_periods(indicator_id)
+        if "periods" in avail:
+            all_p = avail["periods"]
+            f_idx = all_p.index(from_period) if from_period in all_p else 0
+            t_idx = all_p.index(to_period) if to_period in all_p else (len(all_p) - 1)
+            periods = all_p[f_idx : t_idx + 1]
+    elif from_period:
+        periods = [from_period]
+    elif to_period:
+        periods = [to_period]
+
+    return get_data(
+        indicator_id=indicator_id,
+        item_codes=item_codes,
+        periods=periods,
+        limit=limit
+    )
+
+
+def compute_change(
+    indicator_id: int,
+    item_code: str,
+    from_period: str,
+    to_period: str
+) -> Dict[str, Any]:
+    """Ikki davr o'rtasidagi absolyut va foiz o'zgarishini aniq hisoblaydi."""
+    res = get_data(indicator_id=indicator_id, item_codes=[item_code], periods=[from_period, to_period])
+    facts = res.get("data") or []
+    f_from = next((f for f in facts if f.get("period_key") == from_period and f.get("value") is not None), None)
+    f_to = next((f for f in facts if f.get("period_key") == to_period and f.get("value") is not None), None)
+
+    if not f_from or not f_to:
+        return {
+            "error": "Berilgan davrlar uchun to'liq ma'lumot topilmadi.",
+            "indicator_id": indicator_id,
+            "item_code": item_code,
+            "from_period": from_period,
+            "to_period": to_period
+        }
+
+    val1 = float(f_from["value"])
+    val2 = float(f_to["value"])
+    abs_diff = round(val2 - val1, 2)
+    pct_diff = round(((val2 - val1) / abs(val1)) * 100, 2) if val1 != 0 else 0.0
+
+    return {
+        "indicator_id": indicator_id,
+        "item_code": item_code,
+        "item_name": f_from.get("item_name"),
+        "unit": res.get("unit"),
+        "from_period": from_period,
+        "from_value": val1,
+        "to_period": to_period,
+        "to_value": val2,
+        "abs_change": abs_diff,
+        "pct_change": pct_diff
+    }
+
+
+def compare_items(
+    indicator_id: int,
+    item_codes: Optional[List[str]] = None,
+    period: Optional[str] = None
+) -> Dict[str, Any]:
+    """Bir davrda bir nechta qatorni solishtiradi va saralaydi."""
+    if not period:
+        avail = get_available_periods(indicator_id)
+        period = avail.get("max_period") or "2026"
+    if not item_codes:
+        return compare_regions(indicator_id=indicator_id, period=period)
+    res = get_data(indicator_id=indicator_id, item_codes=item_codes, periods=[period])
+    facts = [f for f in (res.get("data") or []) if f.get("value") is not None]
+    facts.sort(key=lambda x: x["value"], reverse=True)
+    return {
+        "indicator_id": indicator_id,
+        "period": period,
+        "total_items": len(facts),
+        "ranking": facts
+    }

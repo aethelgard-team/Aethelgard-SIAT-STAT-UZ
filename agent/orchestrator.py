@@ -242,8 +242,12 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
         uniq_years = sorted(list(dict.fromkeys(years)))
         if len(uniq_years) == 1 and month:
             periods = [f"{uniq_years[0]}-M{month:02d}"]
+        elif len(uniq_years) >= 2 and month:
+            periods = [f"{y}-M{month:02d}" for y in uniq_years]
         elif len(uniq_years) == 1 and quarter:
             periods = [f"{uniq_years[0]}-Q{quarter}"]
+        elif len(uniq_years) >= 2 and quarter:
+            periods = [f"{y}-Q{quarter}" for y in uniq_years]
         elif uniq_years:
             periods = [str(y) for y in uniq_years]
 
@@ -341,7 +345,7 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
     cleaned = re.sub(r"\b(1[89]\d\d|20\d\d)(?:[-\s]*(?:yil(?:da|i|gacha|dan|larda)?))?\b", " ", cleaned)
     cleaned = re.sub(r"\b[1-4][-\s]*chorak(?:da|lik|i)?\b", " ", cleaned)
     for m_name in MONTH_MAP.keys():
-        cleaned = re.sub(rf"\b{re.escape(m_name)}(?:da|i|oyida)?\b", " ", cleaned)
+        cleaned = re.sub(rf"\b{re.escape(m_name)}(?:da|i|oyida|dan|gacha|lar|larga|ga)?\b", " ", cleaned)
 
     # Mamlakat nomini qidiruv shovqinidan chiqarish (hudud sifatida alohida saqlanadi)
     cleaned_no_country = re.sub(r"\bo['`]?zbekiston(?:ning|da|dagi|ga|dan|i)?\b", " ", cleaned)
@@ -676,11 +680,13 @@ def _build_deterministic_answer(
             clean_unit = normalize_display_unit(raw_unit, item_name)
             first_pt = timeline[0]
             last_pt = timeline[-1]
+            pct = dwh_data.get("pct_change")
             if len(timeline) >= 2 and first_pt["period_key"] != last_pt["period_key"]:
+                change_str = f" (o'zgarish: {pct:+.1f}%)" if pct is not None else ""
                 return (
                     f"{item_name} ({ind_name}) qiymati {region_name} bo'yicha {first_pt['period_key']} davrida "
                     f"{first_pt['value']:,.1f} {clean_unit}dan {last_pt['period_key']} davrida "
-                    f"{last_pt['value']:,.1f} {clean_unit}gacha o'zgardi [1]."
+                    f"{last_pt['value']:,.1f} {clean_unit}gacha o'zgardi{change_str} [1]."
                 )
             return (
                 f"{first_pt['period_key']} holatiga ko'ra, {region_name} bo'yicha {item_name} ko'rsatkichi "
@@ -1032,8 +1038,21 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                 indicator_id=tool_args["indicator_id"],
                 item_code=tool_args["item_code"]
             )
-            # Agar yillar oralig'i berilgan bo'lsa, timeline ni shu oraliqqa filtrlash
-            if parsed["years"] and "timeline" in dwh_data:
+            # Agar aniq davrlar (masalan: 2025-M09 va 2026-M09) so'ralgan bo'lsa
+            if parsed["periods"] and len(parsed["periods"]) >= 2 and "timeline" in dwh_data:
+                filtered_tl = [
+                    pt for pt in dwh_data["timeline"]
+                    if pt.get("period_key") in parsed["periods"]
+                ]
+                if len(filtered_tl) >= 2:
+                    dwh_data["timeline"] = filtered_tl
+                    dwh_data["total_points"] = len(filtered_tl)
+                    val1 = float(filtered_tl[0]["value"])
+                    val2 = float(filtered_tl[-1]["value"])
+                    pct = round(((val2 - val1) / abs(val1)) * 100, 1)
+                    dwh_data["pct_change"] = pct
+                    dwh_data["abs_change"] = round(val2 - val1, 1)
+            elif parsed["years"] and "timeline" in dwh_data:
                 min_y, max_y = min(parsed["years"]), max(parsed["years"])
                 filtered_tl = [
                     pt for pt in dwh_data["timeline"]

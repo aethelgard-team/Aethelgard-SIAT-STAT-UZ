@@ -127,6 +127,104 @@ def get_available_periods(indicator_id: int) -> Dict[str, Any]:
     return tools.get_available_periods(indicator_id=indicator_id)
 
 
+# =============================================================================
+# Bobur spetsifikatsiyasiga to'liq mos keluvchi 6 ta asosiy vosita (Tools)
+# =============================================================================
+@mcp.tool()
+def get_indicator(indicator_id: int) -> Dict[str, Any]:
+    """
+    Ko'rsatkich haqida to'liq metama'lumotlar va klassifikator namunalari.
+
+    Args:
+        indicator_id: Ko'rsatkich SIAT ID si (masalan: 1308).
+    """
+    return tools.get_indicator(indicator_id=indicator_id)
+
+
+@mcp.tool()
+def find_items(indicator_id: int, query: str = "") -> Dict[str, Any]:
+    """
+    Ko'rsatkich ichidan aniq mahsulot, tovar yoki hudud klassifikatorini topadi.
+
+    Args:
+        indicator_id: Ko'rsatkich ID si (masalan: 1308).
+        query: Qidirilayotgan tovar yoki hudud nomi (masalan: "mol go'shti", "Toshkent").
+    """
+    return tools.find_items(indicator_id=indicator_id, query=query)
+
+
+@mcp.tool()
+def get_series(
+    indicator_id: int,
+    item_codes: Optional[List[str]] = None,
+    from_period: Optional[str] = None,
+    to_period: Optional[str] = None,
+    limit: int = 500
+) -> Dict[str, Any]:
+    """
+    Belgilangan davrlar va mahsulotlar bo'yicha raqamlar qatorini qaytaradi.
+
+    Args:
+        indicator_id: Ko'rsatkich ID si.
+        item_codes: Klassifikator kodlari (masalan: ["017"]).
+        from_period: Boshlang'ich davr (masalan: "2021-M01").
+        to_period: Yakuniy davr (masalan: "2026-M09").
+        limit: Qatorlar soni (maksimal 500).
+    """
+    return tools.get_series(
+        indicator_id=indicator_id,
+        item_codes=item_codes,
+        from_period=from_period,
+        to_period=to_period,
+        limit=limit
+    )
+
+
+@mcp.tool()
+def compute_change(
+    indicator_id: int,
+    item_code: str,
+    from_period: str,
+    to_period: str
+) -> Dict[str, Any]:
+    """
+    Ikki davr o'rtasidagi o'zgarishni va o'sish foizini aniq hisoblaydi.
+
+    Args:
+        indicator_id: Ko'rsatkich ID si.
+        item_code: Mahsulot/hudud kodi (masalan: "017").
+        from_period: Boshlang'ich davr (masalan: "2025-M09").
+        to_period: Yakuniy davr (masalan: "2026-M09").
+    """
+    return tools.compute_change(
+        indicator_id=indicator_id,
+        item_code=item_code,
+        from_period=from_period,
+        to_period=to_period
+    )
+
+
+@mcp.tool()
+def compare_items(
+    indicator_id: int,
+    item_codes: Optional[List[str]] = None,
+    period: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Bir davrda bir nechta qatorni (hududlar yoki tovarlar) solishtiradi va saralaydi.
+
+    Args:
+        indicator_id: Ko'rsatkich ID si.
+        item_codes: Solishtiriladigan kodlar.
+        period: Davr kaliti (masalan: "2026-M09").
+    """
+    return tools.compare_items(
+        indicator_id=indicator_id,
+        item_codes=item_codes,
+        period=period
+    )
+
+
 # -----------------------------------------------------------------------------
 # 3. Serverni ishga tushirish
 # -----------------------------------------------------------------------------
