@@ -263,7 +263,7 @@ export function createBars() {
   }
 
   // Qaytaradi: [{ row, top: Vector3 (group ichida) }] — bosiladigan joylar uchun
-  function build(rows, { unit = '', title = '' } = {}) {
+  function build(rows, { unit = '', title = '', targetPeriod = '' } = {}) {
     clearAnchors();
     picked = null;
     if (!rows?.length) {
@@ -277,6 +277,11 @@ export function createBars() {
       .filter((r) => r.item_code === firstItem)
       .sort((a, b) => periodOf(a).localeCompare(periodOf(b)))
       .slice(-MAX_BARS);
+    if (targetPeriod) {
+      picked = series.find((r) => periodOf(r) === targetPeriod || r.is_target) ?? null;
+    } else {
+      picked = series.find((r) => r.is_target) ?? null;
+    }
     meta = { unit, title: series[0]?.item_name || title || '' };
     for (const b of layout()) {
       const top = toLocal(b.cx, CHART.y1 - b.h);

@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 
 from mcp_server import tools
 from mcp_server.db import get_db_cursor
+from mcp_server.search import SOATO_REGIONS, resolve_region_from_text
 from agent.verifier import verify_text
 
 # .env yuklash
@@ -95,7 +96,58 @@ SYNONYM_MAP = {
     "yhm": "yalpi hududiy mahsulot",
     "inflyatsiya": "iste'mol narxlari indeksi",
     "maosh": "ish haqi",
+    "oylik": "ish haqi",
 }
+
+COLLOQUIAL_EXPANSIONS = [
+    (r"\b(?:necha|nechi)\s+pul\b", "o'rtacha narxi"),
+    (r"\bqancha\s+turadi\b", "o'rtacha narxi"),
+    (r"\bodam\s+yashaydi\b", "doimiy aholi soni"),
+    (r"\baholi\s+(?:nechta|qancha)\b", "doimiy aholi soni"),
+    (r"\bqancha\s+aholi\b", "doimiy aholi soni"),
+    (r"\b(?:oylik|maosh|ish\s*haqi)\b", "o'rtacha hisoblangan oylik ish haqi"),
+    (r"\bpoytaxt(?:da|ga|ning)?\b", "toshkent shahri"),
+]
+
+
+def normalize_display_unit(unit_raw: Optional[str], item_name: Optional[str] = None) -> str:
+    """
+    O'lchov birligini chiroyli va to'g'ri formatga keltiradi.
+    Agar item_name ichida o'lchov birligi ko'rsatilgan bo'lsa (masalan: 'Tuxum (10 dona)', 'Sut (1 litr)'),
+    ko'rsatkichning '1 kg so'mda' kabi ziddiyatli prefikslarini tozalab, 'so'm (10 dona)' yoki 'so'm' qiladi.
+    """
+    if not unit_raw:
+        return ""
+    u = re.sub(r"['`’‘ʻ]", "'", str(unit_raw)).strip()
+
+    # Item nomidagi qavs ichidagi o'lchov birligini qidirish: (10 dona), (1 litr), (1 dona) va h.k.
+    item_unit_match = None
+    if item_name:
+        m = re.search(r"\(([^)]*(?:dona|litr|kg|metr|gramm|pochka|quti)[^)]*)\)", item_name, re.I)
+        if m:
+            item_unit_match = m.group(1).strip()
+
+    if item_unit_match:
+        # Ziddiyatli 1 kg yoki kg prefiksini olib tashlash
+        u = re.sub(r"^\s*1\s*kg\s*", "", u, flags=re.I)
+        u = re.sub(r"^\s*kg\s*", "", u, flags=re.I)
+        if re.search(r"^so['`]?mda$", u, re.I):
+            u = "so'm"
+        if "so'm" in u.lower():
+            return f"so'm ({item_unit_match})"
+        return f"{u} ({item_unit_match})"
+
+    # Agar item_name da qavs bo'lmasa, lekin "1 kg so'mda" bo'lsa
+    if re.search(r"^\s*1\s*kg\s+so['`]?mda\s*$", u, re.I):
+        return "so'm (1 kg)"
+    if re.search(r"^so['`]?mda$", u, re.I):
+        return "so'm"
+    if re.search(r"^foizda$", u, re.I):
+        return "foiz"
+    if re.search(r"^aqsh\s+dollarida$", u, re.I):
+        return "AQSH dollari"
+
+    return u
 
 
 def get_gemini_client():
@@ -143,6 +195,11 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
     q_norm = re.sub(r"['`’‘ʻ]", "'", query.lower().strip())
     lang = detect_language(q_norm)
 
+    # 0. O'zbekcha so'zlashuv iboralarini kengaytirish (Optimization 4)
+    expanded_q = q_norm
+    for pat, rep in COLLOQUIAL_EXPANSIONS:
+        expanded_q = re.sub(pat, rep, expanded_q)
+
     # 1. Barcha yillar (1800..2099, shu jumladan 1920, 2032 va h.k. tuzoqlar uchun)
     years = [int(y) for y in re.findall(r"\b(1[89]\d\d|20\d\d)\b", q_norm)]
 
@@ -168,14 +225,9 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
     elif years:
         periods = [str(y) for y in years]
 
-    # 5. Hududni ajratish
-    region_hint = None
-    for pat, canonical in REGION_PATTERNS:
-        if pat in q_norm:
-            region_hint = canonical
-            break
-    if not region_hint and ("o'zbekiston" in q_norm or "ozbekiston" in q_norm):
-        region_hint = "o'zbekiston"
+    # 5. Qat'iy SOATO hududini aniqlash (Optimization 1: Strict Region Resolution)
+    soato_code, canonical_region, is_explicit = resolve_region_from_text(q_norm)
+    region_hint = canonical_region.lower()
 
     # 6. Ma'lum mahsulotlar (Standard basket items)
     target_item_code = None
@@ -189,6 +241,10 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
         target_item_code = "0012"
     elif "shakar" in q_norm or "сахар" in q_norm or "sugar" in q_norm:
         target_item_code = "026"
+    elif any(w in q_norm for w in ("non narxi", "buxanka", "qolipli non")) or (
+        "non" in q_norm.split() and any(p in q_norm for p in ("narx", "narxi", "qancha", "so'm", "pul"))
+    ):
+        target_item_code = "013"
 
     # 7. Intent (so'rov turi) aniqlash
     # Fix 3 (Meta-Query Routing): Umumiy katalog va baza haqidagi savollarni ajratish
@@ -245,7 +301,7 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
         intent = "get_data"
 
     # 8. Qidiruv va mavzu kalit so'zlarini tozalash
-    cleaned = q_norm
+    cleaned = expanded_q
     cleaned = re.sub(r"\b(1[89]\d\d|20\d\d)(?:[-\s]*(?:yil(?:da|i|gacha|dan|larda)?))?\b", " ", cleaned)
     cleaned = re.sub(r"\b[1-4][-\s]*chorak(?:da|lik|i)?\b", " ", cleaned)
     for m_name in MONTH_MAP.keys():
@@ -255,9 +311,10 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
     cleaned_no_country = re.sub(r"\bo['`]?zbekiston(?:ning|da|dagi|ga|dan|i)?\b", " ", cleaned)
     cleaned_no_country = re.sub(r"\bress?publikasi(?:da|ning|ga)?\b", " ", cleaned_no_country)
 
-    # Agar hudud nomi matnda bo'lsa (masalan "Toshkentda", "Samarqanddagi"), uni qidiruvda qoldirish ixtiyoriy,
-    # lekin item resolution uchun region_hint ishlatamiz; umumiy qidiruvda hududni tozalab ko'rsatkich nomini topamiz
+    # Hudud nomlarini ko'rsatkich qidiruvi va mavzu tekshiruvi (topic guard) shovqinidan tozalash
     search_source = cleaned_no_country
+    for pat, _ in REGION_PATTERNS:
+        search_source = re.sub(pat, " ", search_source)
     if region_hint and region_hint != "o'zbekiston":
         search_source = re.sub(rf"\b{re.escape(region_hint)}(?:ning|dagi|dan|ga|da|i)?\b", " ", search_source)
 
@@ -298,6 +355,9 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
         "quarter": quarter,
         "month": month,
         "region_hint": region_hint,
+        "region_soato": soato_code,
+        "region_name": canonical_region,
+        "is_region_explicit": is_explicit,
         "target_item_code": target_item_code,
         "intent": intent,
         "topic_tokens": topic_tokens,
@@ -317,16 +377,16 @@ def _normalize_for_match(text: str) -> str:
 def _select_best_candidate_and_item(
     candidates: List[Dict[str, Any]],
     parsed: Dict[str, Any]
-) -> Tuple[Optional[int], Optional[str], bool]:
+) -> Tuple[Optional[int], Optional[str], str, bool]:
     """
     Nomzod ko'rsatkichlar orasidan mavzuga 100% mos keladiganini tanlaydi va
-    dim_item ichidan mos item_code ni aniqlaydi.
+    dim_item ichidan mos item_code hamda SOATO hudud nomini aniqlaydi.
 
     Returns:
-        (selected_indicator_id, resolved_item_code, topic_is_valid)
+        (selected_indicator_id, resolved_item_code, resolved_region_name, topic_is_valid)
     """
     if not candidates:
-        return None, None, False
+        return None, None, "O'zbekiston Respublikasi", False
 
     cand_ids = [c["indicator_id"] for c in candidates[:6]]
     items_by_ind: Dict[int, List[Dict[str, str]]] = {iid: [] for iid in cand_ids}
@@ -426,10 +486,17 @@ def _select_best_candidate_and_item(
             if modern_years and all(min_y <= y <= max_y for y in modern_years):
                 year_bonus = 0.25
 
-        # Agregatsiya / hududiy taqsimot mosligi
+        # Agregatsiya / hududiy taqsimot mosligi (Optimization 1: Strict Region Resolution)
         agg_bonus = 0.0
         has_1700 = any(it["item_code"] == "1700" for it in ind_items)
-        if parsed["intent"] == "compare_regions":
+        req_soato = parsed.get("region_soato")
+        if parsed.get("is_region_explicit") and req_soato and req_soato != "1700":
+            # Foydalanuvchi aniq viloyat/shahar so'ragan (masalan Samarqand, Toshkent shahri)
+            if any(it["item_code"] == req_soato for it in ind_items):
+                agg_bonus += 0.80  # Ushbu indikator aynan so'ralgan hudud klassifikatoriga ega!
+            elif not any(it["item_code"] in SOATO_REGIONS and it["item_code"] != "1700" for it in ind_items):
+                agg_bonus -= 0.60  # Ushbu indikator faqat Respublika darajasida
+        elif parsed["intent"] == "compare_regions":
             agg_bonus = 0.40 if len(ind_items) >= 10 else -0.40
         elif has_1700 and parsed.get("region_hint") in (None, "o'zbekiston"):
             agg_bonus = 0.18
@@ -468,32 +535,38 @@ def _select_best_candidate_and_item(
             best_matched_core = matched_core
 
     # Qat'iy mavzu chegarasi (Topic Guard):
-    # Barcha asosiy predmet tokenlari topilishi kerak (yoki kamida 100% ga yaqin, chunki tuzoqlarda 1 ta begona so'z ham bo'ladi)
+    # Barcha asosiy predmet tokenlari topilishi kerak
     if core_tokens and best_matched_core < len(core_tokens):
-        return None, None, False
+        return None, None, "O'zbekiston Respublikasi", False
 
-    # Item code ni aniqlash
+    # Item code ni va SOATO hududini aniqlash (Optimization 1: Strict Region Resolution)
     resolved_item = parsed["target_item_code"]
     ind_items = items_by_ind.get(best_ind_id, [])
+    target_soato = parsed.get("region_soato") or "1700"
+    resolved_region_name = SOATO_REGIONS.get(target_soato, "O'zbekiston Respublikasi")
 
-    if not resolved_item and ind_items:
-        # 1. Agar hudud so'ralgan bo'lsa
-        r_hint = parsed.get("region_hint")
-        if r_hint and r_hint != "o'zbekiston":
+    soato_items = [it for it in ind_items if it["item_code"] in SOATO_REGIONS]
+
+    if soato_items:
+        # Indikator SOATO hududiy klassifikatoriga ega
+        matched_soato_item = next((it for it in soato_items if it["item_code"] == target_soato), None)
+        if not matched_soato_item and target_soato != "1700":
+            r_hint = parsed.get("region_hint", "")
             for it in ind_items:
-                if r_hint in _normalize_for_match(it["name_uz"]):
-                    resolved_item = it["item_code"]
+                if r_hint and r_hint in _normalize_for_match(it["name_uz"]):
+                    matched_soato_item = it
                     break
+        if not matched_soato_item:
+            matched_soato_item = next((it for it in soato_items if it["item_code"] == "1700"), soato_items[0])
 
-        # 2. Agar hudud berilmagan yoki O'zbekiston bo'lsa, hududiy ko'rsatkichlarda 1700 (Respublika) ni tanlash
         if not resolved_item:
-            for it in ind_items:
-                if it["item_code"] == "1700" or "o'zbekiston respublikasi" in _normalize_for_match(it["name_uz"]):
-                    resolved_item = it["item_code"]
-                    break
+            resolved_item = matched_soato_item["item_code"]
 
-        # 3. Agar aniq tovar/klassifikator tokeni dim_item ichida bo'lsa (so'z chegarasi bilan!)
-        if not resolved_item and len(ind_items) > 1:
+        resolved_region_name = SOATO_REGIONS.get(resolved_item) or matched_soato_item.get("name_uz") or "O'zbekiston Respublikasi"
+    else:
+        # Hududiy bo'lmagan indikator (masalan #1308 iste'mol tovari)
+        if not resolved_item and ind_items:
+            # 1. Agar aniq tovar/klassifikator tokeni dim_item ichida bo'lsa
             for it in ind_items:
                 it_norm = _normalize_for_match(it["name_uz"])
                 for tok in core_tokens:
@@ -503,11 +576,13 @@ def _select_best_candidate_and_item(
                 if resolved_item:
                     break
 
-        # 4. Agar klassifikatorda faqat 1-2 ta umumiy qator bo'lsa birinchisini olish
-        if not resolved_item and len(ind_items) == 1:
-            resolved_item = ind_items[0]["item_code"]
+            # 2. Agar klassifikatorda faqat 1-2 ta umumiy qator bo'lsa
+            if not resolved_item and len(ind_items) == 1:
+                resolved_item = ind_items[0]["item_code"]
 
-    return best_ind_id, resolved_item, True
+        resolved_region_name = "O'zbekiston Respublikasi"
+
+    return best_ind_id, resolved_item, resolved_region_name, True
 
 
 def format_sse(event: str, data: Dict[str, Any]) -> str:
@@ -519,10 +594,11 @@ def _build_deterministic_answer(
     intent: str,
     dwh_data: Dict[str, Any],
     meta_data: Dict[str, Any],
-    parsed: Dict[str, Any]
+    parsed: Dict[str, Any],
+    region_name: str = "O'zbekiston Respublikasi"
 ) -> str:
     """DWH natijalaridan bevosita 100% verifikatsiyadan o'tadigan javob matnini quradi."""
-    unit_str = meta_data.get("unit_uz") or ""
+    raw_unit = meta_data.get("unit_uz") or dwh_data.get("unit") or ""
     ind_name = meta_data.get("name_uz") or "Ko'rsatkich"
 
     if intent == "compare_regions":
@@ -530,14 +606,15 @@ def _build_deterministic_answer(
         bench = dwh_data.get("republic_benchmark")
         period = dwh_data.get("period") or ""
         valid_ranks = [r for r in ranking if r.get("value") is not None]
+        clean_unit = normalize_display_unit(raw_unit, ind_name)
         if valid_ranks:
             top1 = valid_ranks[0]
             txt = (
                 f"{period} holatiga ko'ra, {ind_name} bo'yicha eng yuqori ko'rsatkich "
-                f"{top1['region_name']}da {top1['value']:,.1f} {unit_str}ni tashkil etgan [1]."
+                f"{top1['region_name']}da {top1['value']:,.1f} {clean_unit}ni tashkil etgan [1]."
             )
             if bench and bench.get("value") is not None:
-                txt += f" O'zbekiston Respublikasi bo'yicha umumiy qiymat {bench['value']:,.1f} {unit_str}ga teng [1]."
+                txt += f" O'zbekiston Respublikasi bo'yicha umumiy qiymat {bench['value']:,.1f} {clean_unit}ga teng [1]."
             return txt
         return "Ushbu davr uchun hududlar bo'yicha tasdiqlangan ma'lumot topilmadi."
 
@@ -546,12 +623,13 @@ def _build_deterministic_answer(
         timeline = [pt for pt in (dwh_data.get("data") or dwh_data.get("timeline") or []) if pt.get("value") is not None]
         if timeline:
             item_name = dwh_data.get("item_name") or (timeline[0].get("item_name") if timeline else ind_name)
+            clean_unit = normalize_display_unit(raw_unit, item_name)
             is_min = any(w in parsed["core_search"].lower() for w in ("eng kam", "eng past", "eng arzon", "minimum"))
             extreme_pt = min(timeline, key=lambda x: x["value"]) if is_min else max(timeline, key=lambda x: x["value"])
             ext_label = "eng past (eng kam)" if is_min else "eng yuqori"
             return (
-                f"{item_name} ({ind_name}) bo'yicha {ext_label} ko'rsatkich {extreme_pt['period_key']} davrida qayd etilgan "
-                f"bo'lib, {extreme_pt['value']:,.1f} {unit_str}ni tashkil etgan [1]."
+                f"{item_name} ({ind_name}) bo'yicha {region_name}da {ext_label} ko'rsatkich {extreme_pt['period_key']} davrida qayd etilgan "
+                f"bo'lib, {extreme_pt['value']:,.1f} {clean_unit}ni tashkil etgan [1]."
             )
         return "Ko'rsatilgan davrlar oralig'i uchun bazada tasdiqlangan dinamika ma'lumotlari topilmadi."
 
@@ -559,37 +637,36 @@ def _build_deterministic_answer(
         timeline = [pt for pt in (dwh_data.get("timeline") or []) if pt.get("value") is not None]
         if timeline:
             item_name = dwh_data.get("item_name") or ind_name
+            clean_unit = normalize_display_unit(raw_unit, item_name)
             first_pt = timeline[0]
             last_pt = timeline[-1]
             if len(timeline) >= 2 and first_pt["period_key"] != last_pt["period_key"]:
                 return (
-                    f"{item_name} ({ind_name}) qiymati {first_pt['period_key']} davrida "
-                    f"{first_pt['value']:,.1f} {unit_str}dan {last_pt['period_key']} davrida "
-                    f"{last_pt['value']:,.1f} {unit_str}gacha o'zgardi [1]."
+                    f"{item_name} ({ind_name}) qiymati {region_name} bo'yicha {first_pt['period_key']} davrida "
+                    f"{first_pt['value']:,.1f} {clean_unit}dan {last_pt['period_key']} davrida "
+                    f"{last_pt['value']:,.1f} {clean_unit}gacha o'zgardi [1]."
                 )
             return (
-                f"{first_pt['period_key']} holatiga ko'ra, {item_name} ko'rsatkichi "
-                f"{first_pt['value']:,.1f} {unit_str}ni tashkil etgan [1]."
+                f"{first_pt['period_key']} holatiga ko'ra, {region_name} bo'yicha {item_name} ko'rsatkichi "
+                f"{first_pt['value']:,.1f} {clean_unit}ni tashkil etgan [1]."
             )
         return "Ko'rsatilgan davrlar oralig'i uchun bazada tasdiqlangan dinamika ma'lumotlari topilmadi."
 
     # Default: get_data
     facts = [f for f in (dwh_data.get("data") or []) if f.get("value") is not None]
     if facts:
-        if len(facts) >= 2 and len(parsed["years"]) >= 2:
-            f0, f1 = facts[0], facts[-1]
-            return (
-                f"{f0.get('item_name', ind_name)} ko'rsatkichi {f0.get('period_key')} davrida "
-                f"{f0['value']:,.1f} {unit_str}ni, {f1.get('period_key')} davrida esa "
-                f"{f1['value']:,.1f} {unit_str}ni tashkil etgan [1]."
-            )
-        fact0 = facts[0]
-        item_name = fact0.get("item_name", "ko'rsatkich")
-        period_str = fact0.get("period_key", "")
-        val = fact0.get("value")
+        target_p = parsed.get("detected_period") or parsed.get("target_period")
+        target_fact = next((f for f in facts if f.get("period_key") == target_p), None) if target_p else None
+        if not target_fact:
+            target_fact = facts[-1]
+
+        period_str = target_fact.get("period_key", "")
+        val = target_fact.get("value")
+        item_name = target_fact.get("item_name") or ind_name
+        clean_unit = normalize_display_unit(raw_unit, item_name)
         return (
-            f"{period_str} holatiga ko'ra, {item_name}ning o'rtacha qiymati "
-            f"{val:,.1f} {unit_str}ni tashkil etgan [1]."
+            f"{period_str} holatiga ko'ra, {region_name} bo'yicha {item_name}ning o'rtacha qiymati "
+            f"{val:,.1f} {clean_unit}ni tashkil etgan [1]."
         )
 
     raw_facts = dwh_data.get("data") or []
@@ -628,6 +705,8 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
             "detected_period": target_period,
             "detected_periods": parsed["periods"],
             "detected_item_code": parsed["target_item_code"],
+            "detected_region": parsed.get("region_name"),
+            "region_code": parsed.get("region_soato"),
             "intent": parsed["intent"]
         })
         await asyncio.sleep(0.01)
@@ -778,7 +857,7 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
         search_res = tools.search_indicators(search_keywords, limit=8)
         search_dur_ms = round((time.time() - search_t0) * 1000, 2)
 
-        selected_indicator_id, resolved_item_code, topic_valid = _select_best_candidate_and_item(
+        selected_indicator_id, resolved_item_code, resolved_region_name, topic_valid = _select_best_candidate_and_item(
             search_res.get("results", []), parsed
         )
 
@@ -838,10 +917,12 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                         prefix_hits.append(matches[-1])  # Yilning eng oxirgi mavjud davri
                 resolved_periods = prefix_hits if prefix_hits else parsed["periods"]
 
+        target_period_single = None
         if intent == "compare_regions" and (resolved_periods or avail_periods):
             tool_name = "compare_regions"
             cmp_period = resolved_periods[0] if resolved_periods else avail_periods[-1]
             tool_args = {"indicator_id": selected_indicator_id, "period": cmp_period}
+            target_period_single = cmp_period
         elif (intent in ("time_series", "analytical_extreme")) and resolved_item_code:
             tool_name = "time_series"
             tool_args = {"indicator_id": selected_indicator_id, "item_code": resolved_item_code}
@@ -851,13 +932,34 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
             if intent == "analytical_extreme" and not eff_periods and avail_periods:
                 eff_periods = avail_periods[-12:]
             elif not eff_periods and avail_periods:
-                eff_periods = [avail_periods[-1]]
+                # Agar hech qanday davr berilmagan bo'lsa: eng so'nggi davr va oldingi 11 ta davr (12 davrli kontekst)
+                target_period_single = avail_periods[-1]
+                start_idx = max(0, len(avail_periods) - 12)
+                eff_periods = avail_periods[start_idx:]
+            elif eff_periods and len(eff_periods) == 1 and avail_periods:
+                # Optimization 3 (12-Period Context for Single-Point Queries):
+                # Aniq bitta davr so'ralganda (masalan '2026-M09'), 3D va to'liq ekranli grafik
+                # to'liq 12 davrli trendni ko'rsatishi uchun so'ralgan davrgacha bo'lgan oxirgi 12 davrni olamiz
+                req_p = eff_periods[0]
+                target_period_single = req_p
+                if req_p in avail_periods:
+                    t_idx = avail_periods.index(req_p)
+                else:
+                    matches = [i for i, ap in enumerate(avail_periods) if ap.startswith(f"{req_p}-")]
+                    t_idx = matches[-1] if matches else (len(avail_periods) - 1)
+                    target_period_single = avail_periods[t_idx]
+                start_idx = max(0, t_idx - 11)
+                eff_periods = avail_periods[start_idx : t_idx + 1]
+
             tool_args = {
                 "indicator_id": selected_indicator_id,
                 "item_codes": [resolved_item_code] if resolved_item_code else None,
                 "periods": eff_periods,
                 "limit": 100
             }
+
+        if target_period_single:
+            parsed["detected_period"] = target_period_single
 
         yield format_sse("tool.called", {
             "stage": "tool",
@@ -923,6 +1025,21 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
         # =====================================================================
         result_rows = dwh_data.get("data") or dwh_data.get("timeline") or dwh_data.get("ranking") or []
 
+        # Optimization 2: Measurement Unit Cleanup
+        resolved_item_name = None
+        if result_rows:
+            resolved_item_name = result_rows[0].get("item_name")
+        clean_unit = normalize_display_unit(meta_data.get("unit_uz") or dwh_data.get("unit"), resolved_item_name)
+        meta_data["unit_uz"] = clean_unit
+        dwh_data["unit"] = clean_unit
+
+        # Har bir fakt qatoriga hudud va tozalangan o'lchov birligini qo'shish
+        for r in result_rows:
+            r["region_name"] = resolved_region_name
+            r["unit"] = clean_unit
+            if target_period_single and r.get("period_key") == target_period_single:
+                r["is_target"] = True
+
         # Fix 2 (Analytical Array Parsing):
         # When asked for maximum, minimum, or 'which month/period' (e.g., 'eng yuqori', 'eng kam'),
         # evaluate all periods in the array and select the extreme one.
@@ -942,8 +1059,11 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
             "execution_ms": dwh_dur_ms,
             "table": "dwh.fact_value",
             "indicator_name": meta_data.get("name_uz"),
-            "unit": meta_data.get("unit_uz"),
-            "data": result_rows[:20]
+            "region_name": resolved_region_name,
+            "region_code": parsed.get("region_soato"),
+            "detected_period": parsed.get("detected_period"),
+            "unit": clean_unit,
+            "data": result_rows[:24]
         })
         await asyncio.sleep(0.01)
 
@@ -961,6 +1081,8 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
 
         if gemini_client and result_rows:
             try:
+                target_pt = next((r for r in result_rows if r.get("period_key") == parsed.get("detected_period")), result_rows[0])
+                target_val = target_pt.get("value")
                 prompt = (
                     f"Siz O'zbekiston Davlat statistika qo'mitasi rasmiy ma'lumotlar bazasi analitikasisiz.\n"
                     f"Qat'iy qoidalar:\n"
@@ -968,10 +1090,14 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                     f"2. Yangi raqam hisoblamang va taxminiy raqam kiritmang!\n"
                     f"3. Check the requested measurement unit. If the user asks for price/cost ('narx', 'qancha'), you MUST filter the RRF results and ONLY select indicators where the unit is currency ('so'm'). Never output volume metrics (e.g., 'mln. dona') for price queries.\n"
                     f"4. When asked for maximum, minimum, or 'which month/period' (e.g., 'eng yuqori', 'eng kam'), you must request the full time-series array, evaluate all periods, and select the correct one. The final numerical output provided to the UI MUST perfectly match the text explanation.\n"
-                    f"5. Tasdiqlangan ma'lumotdan keyin [1] manba havolasi qo'ying.\n\n"
+                    f"5. Hudud aniqligi: Natijani doimo aniqlangan hudud ({resolved_region_name}) bilan bog'lang (Respublika o'rtachasimi yoki aniq shahar/viloyatmi).\n"
+                    f"6. O'lchov birligi: O'lchov birligi sifatida aynan '{clean_unit}' dan foydalaning. Ziddiyatli birliklarni (masalan tuxum uchun '1 kg so'mda') mutlaqo ishlatmang.\n"
+                    f"7. Agar foydalanuvchi bitta aniq davrni ({parsed.get('detected_period')}) so'ragan bo'lsa, asosiy javobda aynan shu davr qiymatini ({target_val:,.1f} {clean_unit}) ko'rsating. Qolgan davrlar grafik uchun 12 davrli kontekst sifatida berilgan.\n"
+                    f"8. Tasdiqlangan ma'lumotdan keyin [1] manba havolasi qo'ying.\n\n"
                     f"Savol: '{question}'\n"
                     f"Ko'rsatkich: {meta_data.get('name_uz')}\n"
-                    f"O'lchov birligi: {meta_data.get('unit_uz')}\n"
+                    f"Hudud: {resolved_region_name}\n"
+                    f"O'lchov birligi: {clean_unit}\n"
                     f"DWH natijalari: {json.dumps(result_rows[:12], ensure_ascii=False)}\n"
                     f"O'zbek tilida lo'nda va aniq javob bering."
                 )
@@ -994,7 +1120,7 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                 _gemini_consecutive_failures += 1
 
         if not gemini_succeeded or not raw_llm_text:
-            raw_llm_text = _build_deterministic_answer(tool_name, dwh_data, meta_data, parsed)
+            raw_llm_text = _build_deterministic_answer(tool_name, dwh_data, meta_data, parsed, resolved_region_name)
 
         # Oqimli (streaming) delta voqealari
         words = raw_llm_text.split(" ")

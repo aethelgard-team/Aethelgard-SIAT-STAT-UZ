@@ -137,7 +137,7 @@ export function initAskView({ scene, inspector, demo = null }) {
   const kpi = (id, v) => { const n = $(id); if (n) n.textContent = v; };
   function setMeta(id, v) { $(id).textContent = v ?? '—'; }
 
-  function showFigure(rows, unit, indicatorName = '') {
+  function showFigure(rows, unit, indicatorName = '', regionName = '') {
     const fig = $('#r-figure');
     const valid = rows.filter((r) => r.value !== null && r.value !== undefined && !Number.isNaN(Number(r.value)));
     if (!valid.length) { fig.hidden = true; return; }
@@ -146,12 +146,19 @@ export function initAskView({ scene, inspector, demo = null }) {
     const sorted = [...valid].sort((a, b) => periodOf(a).localeCompare(periodOf(b)));
     const main = sorted.find((r) => periodOf(r) && periodOf(r) === parsed.detected_period
       && (!parsed.detected_item_code || r.item_code === parsed.detected_item_code))
+      ?? sorted.find((r) => r.is_target)
       ?? sorted.findLast((r) => !parsed.detected_item_code || r.item_code === parsed.detected_item_code)
       ?? sorted.at(-1);
     const series = sorted.filter((r) => r.item_code === main.item_code);
 
-    // Faqat bor maydonlar: nom (bo'lmasa ko'rsatkich nomi) va davr; texnik kod va "undefined" chiqmaydi
-    $('#r-label').textContent = joinParts(main.item_name || indicatorName, periodOf(main));
+    // Hudud va ko'rsatkich nomini aniq aks ettirish (Optimization 1: Strict Region Resolution)
+    const finalRegion = regionName || main.region_name || parsed.detected_region || '';
+    const labelTitle = main.item_name || indicatorName || '';
+    const finalLabel = finalRegion && !labelTitle.includes(finalRegion)
+      ? joinParts(labelTitle, finalRegion, periodOf(main))
+      : joinParts(labelTitle, periodOf(main));
+
+    $('#r-label').textContent = finalLabel;
     $('#r-value').textContent = formatNumber(Number(main.value));
     $('#r-unit').textContent = unit || '';
 
@@ -378,10 +385,20 @@ export function initAskView({ scene, inspector, demo = null }) {
         stage('result', 'done');
         const rows = d.data ?? [];
         setStageDetail(stagesEl, 'result', `${rows.length} qator · ${d.execution_ms} ms`);
-        const opts = { unit: d.unit ?? '', sourceUrl: rows[0]?.source_url ?? '', title: d.indicator_name ?? '' };
+        const targetPeriod = d.detected_period || parsed.detected_period || '';
+        const regionName = d.region_name || parsed.detected_region || '';
+        const headerTitle = regionName && d.indicator_name && !d.indicator_name.includes(regionName)
+          ? `${d.indicator_name} (${regionName})`
+          : (d.indicator_name ?? '');
+        const opts = {
+          unit: d.unit ?? '',
+          sourceUrl: rows[0]?.source_url ?? '',
+          title: headerTitle,
+          targetPeriod
+        };
         renderSeriesChart(chartEl, rows, opts);
         scene?.showBars(rows, opts);
-        showFigure(rows, d.unit ?? '', d.indicator_name ?? '');
+        showFigure(rows, d.unit ?? '', d.indicator_name ?? '', regionName);
         if (!tableName && $('#m-table').textContent === '—') setMeta('#m-table', d.indicator_name);
         break;
       }

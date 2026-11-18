@@ -1149,7 +1149,7 @@ export function createAgentScene(container, labelsEl, infoEl) {
     },
 
     // tool.result: tool -> agent (raqamlar agentga qaytadi), keyin agent -> natija ustunlari
-    showBars(rows, { unit = '', sourceUrl = '', title = '' } = {}) {
+    showBars(rows, { unit = '', sourceUrl = '', title = '', targetPeriod = '' } = {}) {
       // Raqamlar tooldan agentga qaytadi (kamera agentda — toolga qayta bormaymiz)
       step(() => {
         setFocus('agent', false);
@@ -1161,7 +1161,7 @@ export function createAgentScene(container, labelsEl, infoEl) {
       step(() => {
         removeLabels('bar');
         hideInfo();
-        const items = bars.build(rows, { unit, title });
+        const items = bars.build(rows, { unit, title, targetPeriod });
         barsTitle.textContent = items.length
           ? joinParts('Natija', items[0].row.item_name || title, `${items.length} davr`, 'past = arzon')
           : 'Natija: mavjud emas';

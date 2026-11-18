@@ -27,7 +27,10 @@ export function renderSeriesChart(container, rows, { unit = '', sourceUrl = '' }
     .sort((a, b) => String(a.period_key).localeCompare(String(b.period_key)));
   const rawItemName = series[0]?.item_name ?? firstItem ?? '';
   const itemName = (rawItemName && String(rawItemName) !== 'undefined') ? String(rawItemName) : '';
-  const cleanUnit = (unit && String(unit) !== 'undefined') ? String(unit) : '';
+  let cleanUnit = (unit && String(unit) !== 'undefined') ? String(unit) : '';
+  if (itemName && /\(([^)]*(?:dona|litr|kg|metr|gramm)[^)]*)\)/i.test(itemName)) {
+    cleanUnit = cleanUnit.replace(/^\s*1\s*kg\s*/i, '').replace(/^\s*kg\s*/i, '').replace(/so['`]?mda/i, "so'm").trim();
+  }
 
   const captionText = itemName ? `${itemName}${cleanUnit ? ` · ${cleanUnit}` : ''}` : (cleanUnit || 'Grafik');
   const caption = el('p', captionText, 'chart-caption');
