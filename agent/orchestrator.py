@@ -78,9 +78,12 @@ STOPWORDS = {
     "ko'rsatkich", "korsatkich", "ko'rsatkichi", "statistika", "statistikasi",
     "o'sdi", "osdi", "o'zgardi", "ozgardi", "o'zgarish", "ozgarish", "davomida",
     "orasida", "nisbatan", "solishtirganda", "taqqoslang", "solishtiring", "reyting",
+    "solishtir", "taqqosla", "solishtirish", "taqqoslash",
     "qayd", "etilgan", "qilib", "barcha", "jami", "respublika", "respublikasi",
     "viloyat", "viloyati", "viloyatda", "hudud", "hududda", "hududlar", "kesimida",
-    "mamlakat", "mamlakatda", "bo'yicha", "boyicha"
+    "mamlakat", "mamlakatda", "bo'yicha", "boyicha", "rostmi", "togrimi", "to'g'rimi",
+    "rost", "haqiqatmi", "bormi", "yoqmi", "yo'qmi", "tushgani", "oshgani", "yetgani",
+    "bolgani", "bo'lgani", "so'm", "som", "sum", "dollar", "valyuta"
 }
 
 # Asosiy predmetni tekshirishda ixtiyoriy bo'lgan statistik sifatlar
@@ -203,27 +206,46 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
     # 1. Barcha yillar (1800..2099, shu jumladan 1920, 2032 va h.k. tuzoqlar uchun)
     years = [int(y) for y in re.findall(r"\b(1[89]\d\d|20\d\d)\b", q_norm)]
 
-    # 2. Chorak (1-chorak, 3-chorak, Q3)
+    # 2. Aniq davr formati (masalan: 2026-M09, 2026-M03, 2026-Q3)
+    explicit_m = re.search(r"\b(1[89]\d\d|20\d\d)-[mM](\d{1,2})\b", q_norm)
+    explicit_q = re.search(r"\b(1[89]\d\d|20\d\d)-[qQ]([1-4])\b", q_norm)
+
     quarter = None
-    q_match = re.search(r"\b([1-4])[-\s]*chorak|\bq([1-4])\b", q_norm)
-    if q_match:
-        quarter = int(q_match.group(1) or q_match.group(2))
-
-    # 3. Oy nomlari
     month = None
-    for m_name, m_num in MONTH_MAP.items():
-        if re.search(rf"\b{re.escape(m_name)}", q_norm):
-            month = m_num
-            break
-
-    # 4. Maqsadli davrlar ro'yxati
     periods: List[str] = []
-    if len(years) == 1 and month:
-        periods = [f"{years[0]}-M{month:02d}"]
-    elif len(years) == 1 and quarter:
-        periods = [f"{years[0]}-Q{quarter}"]
-    elif years:
-        periods = [str(y) for y in years]
+
+    if explicit_m:
+        p_year = int(explicit_m.group(1))
+        p_month = int(explicit_m.group(2))
+        periods = [f"{p_year}-M{p_month:02d}"]
+        years = [p_year]
+        month = p_month
+    elif explicit_q:
+        p_year = int(explicit_q.group(1))
+        p_quarter = int(explicit_q.group(2))
+        periods = [f"{p_year}-Q{p_quarter}"]
+        years = [p_year]
+        quarter = p_quarter
+    else:
+        # Chorak (1-chorak, 3-chorak, Q3)
+        q_match = re.search(r"\b([1-4])[-\s]*chorak|\bq([1-4])\b", q_norm)
+        if q_match:
+            quarter = int(q_match.group(1) or q_match.group(2))
+
+        # Oy nomlari
+        for m_name, m_num in MONTH_MAP.items():
+            if re.search(rf"\b{re.escape(m_name)}", q_norm):
+                month = m_num
+                break
+
+        # Maqsadli davrlar ro'yxati
+        uniq_years = sorted(list(dict.fromkeys(years)))
+        if len(uniq_years) == 1 and month:
+            periods = [f"{uniq_years[0]}-M{month:02d}"]
+        elif len(uniq_years) == 1 and quarter:
+            periods = [f"{uniq_years[0]}-Q{quarter}"]
+        elif uniq_years:
+            periods = [str(y) for y in uniq_years]
 
     # 5. Qat'iy SOATO hududini aniqlash (Optimization 1: Strict Region Resolution)
     soato_code, canonical_region, is_explicit = resolve_region_from_text(q_norm)
@@ -234,13 +256,15 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
     if "mol go'sht" in q_norm or "mol gosht" in q_norm or "говядин" in q_norm or "beef" in q_norm:
         target_item_code = "017"
     elif "qo'y go'sht" in q_norm or "qoy gosht" in q_norm or "баранин" in q_norm:
-        target_item_code = "018"
+        target_item_code = "0020"
     elif "tuxum" in q_norm or "яйц" in q_norm or "egg" in q_norm:
         target_item_code = "034"
     elif "un narxi" in q_norm or "bug'doy un" in q_norm:
         target_item_code = "0012"
     elif "shakar" in q_norm or "сахар" in q_norm or "sugar" in q_norm:
-        target_item_code = "026"
+        target_item_code = "073"
+    elif "kartoshka" in q_norm or "картошк" in q_norm or "potato" in q_norm:
+        target_item_code = "069"
     elif any(w in q_norm for w in ("non narxi", "buxanka", "qolipli non")) or (
         "non" in q_norm.split() and any(p in q_norm for p in ("narx", "narxi", "qancha", "so'm", "pul"))
     ):
@@ -260,19 +284,29 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
             r"katalog",
             r"baza haqida",
             r"bazada nima",
-            r"eng so['`]?nggi ma['`]?lumot",
-            r"eng oxirgi ma['`]?lumot",
+            r"bazadagi",
+            r"eng so['`]?nggi",
+            r"eng oxirgi",
+            r"so['`]?nggi yangilangan",
+            r"oxirgi yangilangan",
+            r"eng yangi",
             r"mavjud ko['`]?rsatkich",
+            r"ko['`]?rsatkichlar soni",
+            r"ko['`]?rsatkichlar ro['`]?yxati",
             r"what data",
             r"what indicators",
             r"database overview"
         ]
     ) and not any(w in q_norm for w in ("narxi", "narx", "tuxum", "go'sht", "aholi", "yaim", "inflyatsiya", "import", "eksport", "maosh", "dollar"))
 
+    uniq_years_count = len(set(years))
     is_region_cmp = (
-        any(w in q_norm for w in ("qaysi viloyat", "qaysi hudud", "viloyatlar", "hududlar", "viloyatida", "hududida"))
+        any(w in q_norm for w in (
+            "qaysi viloyat", "qaysi hudud", "viloyatlar", "hududlar", "viloyatida", "hududida",
+            "solishtir", "taqqosla", "solishtiring", "taqqoslang", "solishtirish", "taqqoslash"
+        ))
         or (any(w in q_norm for w in ("eng yuqori", "eng past", "reyting")) and any(w in q_norm for w in ("viloyat", "hudud", "respublika")))
-    ) and len(years) <= 1
+    ) and uniq_years_count <= 1
 
     # Fix 2 (Analytical Array Parsing): Davrlar/oylar bo'yicha ekstremum yoki analitik so'rov
     is_period_extreme = (
@@ -285,7 +319,7 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
     )
 
     is_dynamics = (
-        len(years) >= 2
+        uniq_years_count >= 2
         or any(w in q_norm for w in ("dinamik", "o'zgardi", "ozgardi", "o'sish", "osish", "kamay", "yildan", "yilgacha", "davomida"))
     )
 
@@ -302,6 +336,8 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
 
     # 8. Qidiruv va mavzu kalit so'zlarini tozalash
     cleaned = expanded_q
+    cleaned = re.sub(r"\b(1[89]\d\d|20\d\d)-[mMqQ]\d{1,2}\b", " ", cleaned)
+    cleaned = re.sub(r"\b[mMqQ]\d{1,2}\b", " ", cleaned)
     cleaned = re.sub(r"\b(1[89]\d\d|20\d\d)(?:[-\s]*(?:yil(?:da|i|gacha|dan|larda)?))?\b", " ", cleaned)
     cleaned = re.sub(r"\b[1-4][-\s]*chorak(?:da|lik|i)?\b", " ", cleaned)
     for m_name in MONTH_MAP.keys():
@@ -324,7 +360,7 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
 
     for w in raw_words:
         w_clean = w.strip("'")
-        if len(w_clean) < 3:
+        if len(w_clean) < 3 or w_clean.isdigit():
             continue
         w_stem = _stem_uz_token(w_clean)
         if w_clean in STOPWORDS or w_stem in STOPWORDS:
@@ -944,12 +980,18 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                 target_period_single = req_p
                 if req_p in avail_periods:
                     t_idx = avail_periods.index(req_p)
+                    start_idx = max(0, t_idx - 11)
+                    eff_periods = avail_periods[start_idx : t_idx + 1]
                 else:
                     matches = [i for i, ap in enumerate(avail_periods) if ap.startswith(f"{req_p}-")]
-                    t_idx = matches[-1] if matches else (len(avail_periods) - 1)
-                    target_period_single = avail_periods[t_idx]
-                start_idx = max(0, t_idx - 11)
-                eff_periods = avail_periods[start_idx : t_idx + 1]
+                    if matches:
+                        t_idx = matches[-1]
+                        target_period_single = avail_periods[t_idx]
+                        start_idx = max(0, t_idx - 11)
+                        eff_periods = avail_periods[start_idx : t_idx + 1]
+                    else:
+                        eff_periods = [req_p]
+                        target_period_single = req_p
 
             tool_args = {
                 "indicator_id": selected_indicator_id,
