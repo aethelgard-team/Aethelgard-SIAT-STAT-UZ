@@ -219,6 +219,22 @@ def rrf_hybrid_search(query: str, limit: int = 10, k: int = 60) -> List[Dict[str
             if "(jami)" in name_low:
                 item["rrf_score"] += 0.0005
 
+    # Fix 1 (Unit Semantic Matching): Agar so'rov narx/qiymat haqida bo'lsa ('narx', 'narxi', 'so'm', 'baho'),
+    # o'lchov birligi valyuta ('so'm', 'sum') bo'lgan ko'rsatkichlarga ustunlik berish,
+    # hajm/miqdor ('mln. dona', 'ming dona', 'tonna') bo'lgan ko'rsatkichlarni keskin jarimalash.
+    is_price_seeking = any(w in raw_norm for w in ("narx", "narxi", "narxlari", "so'm", "som", "baho", "цена", "стоимость", "price", "cost"))
+    if is_price_seeking:
+        for item in scores.values():
+            u_raw = item.get("unit") or ""
+            u_norm = re.sub(r"['`’‘ʻ]", "'", u_raw.lower())
+            name_low = (item.get("name_uz") or "").lower()
+            if any(cu in u_norm for cu in ("so'm", "som", "сум", "sum")):
+                item["rrf_score"] += 0.020
+                if "o'rtacha narx" in name_low or "iste'mol narx" in name_low or "narxlari" in name_low:
+                    item["rrf_score"] += 0.010
+            elif any(vu in u_norm for vu in ("dona", "tonna", "metr", "litr", "birlik", "foiz")) and not any(cu in u_norm for cu in ("so'm", "som", "сум", "sum")):
+                item["rrf_score"] -= 0.020
+
     # Natijalarni RRF ballari kamayish tartibida saralash
     sorted_results = sorted(
         scores.values(),

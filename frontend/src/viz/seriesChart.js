@@ -25,9 +25,12 @@ export function renderSeriesChart(container, rows, { unit = '', sourceUrl = '' }
   const series = rows
     .filter((r) => r.item_code === firstItem)
     .sort((a, b) => String(a.period_key).localeCompare(String(b.period_key)));
-  const itemName = series[0].item_name ?? firstItem;
+  const rawItemName = series[0]?.item_name ?? firstItem ?? '';
+  const itemName = (rawItemName && String(rawItemName) !== 'undefined') ? String(rawItemName) : '';
+  const cleanUnit = (unit && String(unit) !== 'undefined') ? String(unit) : '';
 
-  const caption = el('p', `${itemName}${unit ? ` · ${unit}` : ''}`, 'chart-caption');
+  const captionText = itemName ? `${itemName}${cleanUnit ? ` · ${cleanUnit}` : ''}` : (cleanUnit || 'Grafik');
+  const caption = el('p', captionText, 'chart-caption');
   container.append(caption);
 
   // Bitta qiymat bo'lsa grafik emas, katta raqam ko'rsatamiz

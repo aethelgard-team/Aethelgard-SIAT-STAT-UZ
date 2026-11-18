@@ -32,11 +32,16 @@ export function createScene2D(container, { reason = '' } = {}) {
       warehouseEl.textContent = base;
     },
     selectIndicator(id) {
-      warehouseEl.textContent = `${base} → #${id}`;
+      if (id && String(id) !== 'undefined') {
+        warehouseEl.textContent = `${base} → #${id}`;
+      } else {
+        warehouseEl.textContent = base;
+      }
     },
-    showBars(rows) {
+    showBars(rows, { unit = '', title = '' } = {}) {
+      const cleanTitle = (title && String(title) !== 'undefined') ? ` (${title})` : '';
       resultEl.textContent = rows?.length
-        ? `Natija: ${rows.length} qator — natija kartasida`
+        ? `Natija: ${rows.length} qator${cleanTitle} — natija kartasida`
         : 'Natija: mavjud emas';
     },
     reset() {
