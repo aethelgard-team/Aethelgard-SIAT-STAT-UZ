@@ -66,7 +66,7 @@ COPY deploy_data/ ./deploy_data/
 
 # Copy boot entrypoint script
 COPY hf_entrypoint.sh ./
-RUN chmod +x hf_entrypoint.sh
+RUN sed -i 's/\r$//' hf_entrypoint.sh && chmod +x hf_entrypoint.sh
 
 # Expose standard Hugging Face Spaces port
 EXPOSE 7860
@@ -81,4 +81,4 @@ ENV DB_USER=postgres
 ENV DB_NAME=siat_dwh
 ENV DATABASE_URL=postgresql://postgres@localhost:5432/siat_dwh
 
-CMD ["/app/hf_entrypoint.sh"]
+CMD ["/bin/bash", "/app/hf_entrypoint.sh"]
