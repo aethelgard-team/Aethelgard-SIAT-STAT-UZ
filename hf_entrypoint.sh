@@ -9,11 +9,9 @@ echo "==========================================================================
 # 1. Start PostgreSQL Service
 # ------------------------------------------------------------------------------
 echo "=== [1/4] Starting PostgreSQL Service ==="
-if [ -d /etc/postgresql ]; then
-    find /etc/postgresql -name pg_hba.conf -exec sed -i 's/peer/trust/g' {} +
-    find /etc/postgresql -name pg_hba.conf -exec sed -i 's/md5/trust/g' {} +
-    find /etc/postgresql -name pg_hba.conf -exec sed -i 's/scram-sha-256/trust/g' {} +
-fi
+find /etc/postgresql -name pg_hba.conf -exec sed -i 's/peer/trust/g' {} + 2>/dev/null || true
+find /etc/postgresql -name pg_hba.conf -exec sed -i 's/md5/trust/g' {} + 2>/dev/null || true
+find /etc/postgresql -name pg_hba.conf -exec sed -i 's/scram-sha-256/trust/g' {} + 2>/dev/null || true
 
 service postgresql start || /etc/init.d/postgresql start
 
@@ -27,24 +25,18 @@ echo "[OK] PostgreSQL service is ready and accepting connections."
 # 2. Database Initialization & Restore (siat_dwh)
 # ------------------------------------------------------------------------------
 echo "=== [2/4] Checking and Initializing Database (siat_dwh) ==="
-DB_EXISTS=$(su - postgres -c "psql -tAc \"SELECT 1 FROM pg_database WHERE datname='siat_dwh'\"" || echo "")
+psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE siat_dwh;" 2>/dev/null || true
+psql -h localhost -p 5432 -U postgres -d siat_dwh -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;" 2>/dev/null || true
 
-if [ "$DB_EXISTS" != "1" ]; then
-    echo "[*] Creating database 'siat_dwh'..."
-    su - postgres -c "psql -c 'CREATE DATABASE siat_dwh;'"
-    su - postgres -c "psql -d siat_dwh -c 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'"
-else
-    echo "[OK] Database 'siat_dwh' already exists."
-fi
-
-# Check if dwh tables exist
-TABLE_COUNT=$(su - postgres -c "psql -d siat_dwh -tAc \"SELECT count(*) FROM information_schema.tables WHERE table_schema='dwh'\"" || echo "0")
+TABLE_COUNT=$(psql -h localhost -p 5432 -U postgres -d siat_dwh -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='dwh'" 2>/dev/null || echo "0")
 
 if [ "$TABLE_COUNT" -eq "0" ]; then
     if [ -f "/app/deploy_data/siat_dwh_backup.dump" ]; then
         echo "[*] Restoring DWH schema and 2.58M+ facts from /app/deploy_data/siat_dwh_backup.dump..."
+        chmod 777 /app/deploy_data/siat_dwh_backup.dump 2>/dev/null || true
         PG_RESTORE_BIN=$(which pg_restore || ls -1 /usr/lib/postgresql/*/bin/pg_restore 2>/dev/null | sort -V | tail -n 1)
-        su - postgres -c "$PG_RESTORE_BIN -U postgres -d siat_dwh -v /app/deploy_data/siat_dwh_backup.dump" || true
+        echo "Using restore binary: $PG_RESTORE_BIN"
+        "$PG_RESTORE_BIN" -h localhost -p 5432 -U postgres --no-owner --no-privileges -d siat_dwh -v /app/deploy_data/siat_dwh_backup.dump 2>&1 | tail -n 25 || true
         echo "[OK] Database restore completed successfully!"
     else
         echo "[!] Warning: /app/deploy_data/siat_dwh_backup.dump not found. Applying empty schema..."
