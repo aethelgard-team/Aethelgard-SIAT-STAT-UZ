@@ -8,6 +8,7 @@
 [![MCP](https://img.shields.io/badge/Model_Context_Protocol-11_Tools-orange.svg)](https://modelcontextprotocol.io/)
 [![LLM](https://img.shields.io/badge/LLM-Gemini_2.5_Flash-4285F4.svg)](https://ai.google.dev/)
 [![Zero Hallucination](https://img.shields.io/badge/Zero_Hallucination-100%25_Verified-success.svg)](#3-50-ta-savollik-stress-test-benchmarki)
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-yellow)](https://huggingface.co/spaces/Siddiq1804/aethelgard-siat)
 
 > **O'zbekiston Respublikasi Prezidenti huzuridagi Statistika agentligi (SIAT / stat.uz)** rasmiy ochiq ma'lumotlari asosida ishlovchi, **100% nol-gallyutsinatsiya (Zero-Hallucination)** kafolati, **11 ta MCP asbobi**, **PostgreSQL gibrid qidiruvi (tsvector + pg_trgm + RRF)** hamda interaktiv **3D xoreografiya** bilan jihozlangan sun'iy intellekt tahliliy platformasi.
 
@@ -24,6 +25,7 @@
 4. [Noldan Ishga Tushirish (Step-by-Step)](#-noldan-ishga-tushirish-step-by-step-guide)
    - [1-Klikda Ishga Tushirish (start_siat.bat)](#1-klikda-ishga-tushirish-windows)
    - [Taqdimot Demo Rejimi (?demo)](#-taqdimot-demo-rejimi-offline-fallback)
+   - [Jonli Bulut Deploy (Hugging Face Spaces)](#️-jonli-bulut-deploy-247-online--hugging-face-spaces)
 5. [Loyiha Tuzilishi](#-loyiha-tuzilishi)
 6. [Taqdimotchi va Hakamlar Uchun Eslatma](#-taqdimotchi-va-hakamlar-uchun-maxsus-eslatmalar)
 
@@ -237,6 +239,18 @@ Ushbu havolada taqdimot uchun belgilangan asosiy savollar:
 * *"2030-yilda inflyatsiya qancha bo'ladi?"* (Halol rad etish namunasi)
 
 barcha 3D o'tishlari, DWH faktlari va grafikalari bilan tarmoqsiz ham bir zumda bekamu-ko'st ishlaydi.
+
+---
+
+### ☁️ Jonli Bulut Deploy (24/7 Online — Hugging Face Spaces)
+
+Loyihaning to‘liq arxitekturasi (**FastAPI + MCP + Three.js 3D UI + PostgreSQL 16 DWH** va barcha **3,232 ta ko‘rsatkich / 2.58M+ qator** ma’lumotlar bazasi) alohida Docker konteynerida Hugging Face bulut serveriga joylashtirilgan bo‘lib, istalgan kompyuter yoki telefondan o‘rnatishlarsiz **24/7 real vaqtda** ishlaydi:
+
+- 🌍 **Jonli 3D Ilova (To‘liq ekranda):** [https://siddiq1804-aethelgard-siat.hf.space](https://siddiq1804-aethelgard-siat.hf.space)
+- 🚀 **Hugging Face Space sahifasi:** [https://huggingface.co/spaces/Siddiq1804/aethelgard-siat](https://huggingface.co/spaces/Siddiq1804/aethelgard-siat)
+- ⚡ **Bulutdagi tezkor Demo rejim:** [https://siddiq1804-aethelgard-siat.hf.space/?demo](https://siddiq1804-aethelgard-siat.hf.space/?demo)
+
+> **Eslatma:** Bepul bulut serveri 48 soat foydalanilmasa resursni tejash uchun kutish (sleep) rejimiga o‘tadi. Birinchi ochishda baza tiklanishi uchun **20–30 soniya** kutish talab etilishi mumkin, shundan so‘ng barcha so‘rovlar ~1.7 soniyada ishlaydi.
 
 ---
 
