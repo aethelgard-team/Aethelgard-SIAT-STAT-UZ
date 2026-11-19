@@ -312,6 +312,5 @@ Taqdimot (Demo Day) paytida quyidagi 3 ta asosiy muhandislik yutug'ini alohida t
 
 ---
 
-**Muallif:** Aethelgard Jamoasi  
-**Litsenziya:** MIT License  
+ 
 **Ma'lumotlar manbasi:** [SIAT - O'zbekiston Respublikasi Prezidenti huzuridagi Statistika agentligi](https://stat.uz)
