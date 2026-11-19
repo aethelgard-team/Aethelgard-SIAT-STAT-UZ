@@ -1,3 +1,14 @@
+---
+title: Aethelgard SIAT 3D Observatory
+emoji: 🇺🇿
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+license: mit
+---
+
 # Aethelgard · SIAT (O'zbekiston Davlat Statistikasi AI Platformasi)
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
