@@ -297,6 +297,17 @@ body.busy .chip { opacity: .45; pointer-events: none; }
 .rbadge[data-state='error'] { color: #fecaca; background: rgba(248, 113, 113, .1); border-color: rgba(248, 113, 113, .4); }
 .rbadge.ghost { color: var(--muted); background: none; border-color: var(--stroke); font: 500 .7rem var(--mono); }
 
+.compound-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 10px; }
+.compound-tabs:empty { display: none; }
+.compound-tab {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+  border-radius: 8px; background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1); color: var(--muted);
+  font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all 0.15s ease; user-select: none;
+}
+.compound-tab:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); border-color: rgba(255, 255, 255, 0.2); }
+.compound-tab.active { background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.45); color: #38bdf8; font-weight: 600; }
+
 .r-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-top: 14px; }
 .r-label { font-size: .75rem; color: var(--muted); }
 .r-value { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; }
@@ -323,7 +334,12 @@ body.busy .chip { opacity: .45; pointer-events: none; }
 .answer[data-state='error'] { color: var(--red); }
 .sources { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-wrap: wrap; gap: 6px; font-size: .74rem; }
 .sources:empty { display: none; }
-.sources li { padding: 4px 10px; border-radius: 999px; background: rgba(56, 189, 248, .06); border: 1px solid rgba(56, 189, 248, .25); }
+.sources li {
+  padding: 4px 10px; border-radius: 999px; background: rgba(56, 189, 248, .06);
+  border: 1px solid rgba(56, 189, 248, .25); cursor: pointer; transition: background 0.15s, border-color 0.15s;
+}
+.sources li:hover { background: rgba(56, 189, 248, .15); border-color: rgba(56, 189, 248, .5); }
+.sources li[data-active='true'] { background: rgba(56, 189, 248, .2); border-color: rgba(56, 189, 248, .7); color: #38bdf8; font-weight: 600; }
 .sources small, .search-results small, .catalog-results small { color: var(--muted); }
 
 .r-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .06); }

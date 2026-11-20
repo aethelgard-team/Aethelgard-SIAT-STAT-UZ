@@ -6,7 +6,7 @@ import { sfx } from '../audio/sfx.js';
 import { replay, downloadRecording } from '../api/demo.js';
 import { renderStages, setStageState, setStageDetail, failActiveStages } from './stagesPanel.js';
 import { renderSeriesChart } from '../viz/seriesChart.js';
-import { formatNumber, el, periodOf, joinParts } from '../core/format.js';
+import { formatNumber, el, periodOf, joinParts, formatPeriodLabel, formatCompactPeriod } from '../core/format.js';
 import { STAGES, TOOLS } from '../core/stages.js';
 
 // Qaysi voqea qaysi bosqichga tegishli (inspektor uchun)
@@ -42,6 +42,11 @@ export function initAskView({ scene, inspector, demo = null }) {
   const pipeState = $('#pipe-state');
   const agentState = $('#agent-state');
   const statusBadge = $('#r-status');
+  const compoundTabsEl = $('#compound-tabs');
+
+  let currentSubResults = null;
+  let activeSubIndex = 1;
+  let lastSources = [];
 
   // Shu savoldagi barcha voqealar: [{ name, data, t }] — inspektor va demo yozuvi uchun
   let log = [];
@@ -137,7 +142,7 @@ export function initAskView({ scene, inspector, demo = null }) {
   const kpi = (id, v) => { const n = $(id); if (n) n.textContent = v; };
   function setMeta(id, v) { $(id).textContent = v ?? '—'; }
 
-  function showFigure(rows, unit, indicatorName = '', regionName = '') {
+  function showFigure(rows, unit, indicatorName = '', regionName = '', customPeriod = '') {
     const fig = $('#r-figure');
     const valid = rows.filter((r) => r.value !== null && r.value !== undefined && !Number.isNaN(Number(r.value)));
     if (!valid.length) { fig.hidden = true; return; }
@@ -154,9 +159,10 @@ export function initAskView({ scene, inspector, demo = null }) {
     // Hudud va ko'rsatkich nomini aniq aks ettirish (Optimization 1: Strict Region Resolution)
     const finalRegion = regionName || main.region_name || parsed.detected_region || '';
     const labelTitle = main.item_name || indicatorName || '';
+    const pLabel = customPeriod || (periodOf(main) ? formatPeriodLabel(periodOf(main)) : '');
     const finalLabel = finalRegion && !labelTitle.includes(finalRegion)
-      ? joinParts(labelTitle, finalRegion, periodOf(main))
-      : joinParts(labelTitle, periodOf(main));
+      ? joinParts(labelTitle, finalRegion, pLabel)
+      : joinParts(labelTitle, pLabel);
 
     $('#r-label').textContent = finalLabel;
     $('#r-value').textContent = formatNumber(Number(main.value));
@@ -171,7 +177,7 @@ export function initAskView({ scene, inspector, demo = null }) {
       const pct = ((Number(main.value) - Number(prev.value)) / Math.abs(Number(prev.value))) * 100;
       deltaEl.className = `delta ${pct > 0.05 ? 'up' : pct < -0.05 ? 'down' : 'flat'}`;
       deltaEl.textContent = `${pct > 0 ? '▲' : pct < 0 ? '▼' : '•'} ${Math.abs(pct).toFixed(1).replace('.', ',')}%`;
-      capEl.textContent = periodOf(prev) ? `${periodOf(prev)} ga nisbatan` : 'oldingi davrga nisbatan';
+      capEl.textContent = periodOf(prev) ? `${formatPeriodLabel(periodOf(prev))} ga nisbatan` : 'oldingi davrga nisbatan';
     } else {
       deltaEl.textContent = '';
       capEl.textContent = '';
@@ -184,9 +190,56 @@ export function initAskView({ scene, inspector, demo = null }) {
       .sort((a, b) => periodOf(a).localeCompare(periodOf(b)));
     drawBars($('#r-bars'), allRows, main, unit);
     $('#r-spark-cap').textContent = series.length > 1
-      ? joinParts(periodOf(series[0]) && periodOf(series.at(-1)) ? `${periodOf(series[0])} — ${periodOf(series.at(-1))}` : '', `${series.length} davr`)
+      ? joinParts(periodOf(series[0]) && periodOf(series.at(-1)) ? `${formatCompactPeriod(periodOf(series[0]))} — ${formatCompactPeriod(periodOf(series.at(-1)))}` : '', `${series.length} davr`)
       : '';
     fig.hidden = false;
+  }
+
+  function renderCompoundTabs(subResults) {
+    compoundTabsEl.replaceChildren();
+    if (!subResults || subResults.length < 2) {
+      compoundTabsEl.hidden = true;
+      return;
+    }
+    subResults.forEach((sr) => {
+      const tabBtn = el('button', `${sr.index}. ${sr.title}`, 'compound-tab');
+      tabBtn.type = 'button';
+      if (sr.index === activeSubIndex) tabBtn.classList.add('active');
+      tabBtn.addEventListener('click', () => {
+        selectSubResult(sr.index);
+      });
+      compoundTabsEl.append(tabBtn);
+    });
+    compoundTabsEl.hidden = false;
+  }
+
+  function selectSubResult(index) {
+    if (!currentSubResults) return;
+    const targetSub = currentSubResults.find((s) => s.index === index) || currentSubResults[0];
+    activeSubIndex = targetSub.index;
+
+    // Tablar holatini yangilash
+    [...compoundTabsEl.children].forEach((btn, i) => {
+      btn.classList.toggle('active', currentSubResults[i]?.index === activeSubIndex);
+    });
+
+    // 2D grafik va 3D ustunlarni yangilash
+    const headerTitle = targetSub.region && !targetSub.title.includes(targetSub.region)
+      ? `${targetSub.title} (${targetSub.region})`
+      : targetSub.title;
+    const opts = {
+      unit: targetSub.unit,
+      title: headerTitle,
+      targetPeriod: targetSub.period_raw
+    };
+    renderSeriesChart(chartEl, targetSub.series, opts);
+    scene?.showBars(targetSub.series, opts);
+
+    // Katta KPI kartani yangilash
+    showFigure(targetSub.series, targetSub.unit, targetSub.title, targetSub.region, targetSub.period_label);
+
+    // Manbalar ro'yxatida faol bandni yangilash
+    renderSources(sourcesEl, lastSources, currentSubResults, (idx) => selectSubResult(idx), activeSubIndex);
   }
 
   // Yangi savol — eski holatni to'liq tozalaymiz
@@ -207,6 +260,11 @@ export function initAskView({ scene, inspector, demo = null }) {
     chartEl.replaceChildren();
     verifyEl.replaceChildren();
     sourcesEl.replaceChildren();
+    compoundTabsEl.replaceChildren();
+    compoundTabsEl.hidden = true;
+    currentSubResults = null;
+    activeSubIndex = 1;
+    lastSources = [];
     answerEl.textContent = '';
     answerEl.dataset.state = 'streaming';
     $('#r-figure').hidden = true;
@@ -400,6 +458,11 @@ export function initAskView({ scene, inspector, demo = null }) {
         scene?.showBars(rows, opts);
         showFigure(rows, d.unit ?? '', d.indicator_name ?? '', regionName);
         if (!tableName && $('#m-table').textContent === '—') setMeta('#m-table', d.indicator_name);
+        if (d.sub_results && d.sub_results.length >= 2) {
+          currentSubResults = d.sub_results;
+          activeSubIndex = 1;
+          renderCompoundTabs(currentSubResults);
+        }
         break;
       }
 
@@ -415,19 +478,42 @@ export function initAskView({ scene, inspector, demo = null }) {
 
       case 'done': {
         // Yakuniy javob — faqat tekshiruvdan o'tgan jumlalar
-        answerEl.textContent = d.answer || 'Bu haqda ma’lumot topilmadi.';
+        if (d.sub_results && d.sub_results.length >= 2) {
+          currentSubResults = d.sub_results;
+          renderCompoundTabs(currentSubResults);
+        }
+        if (d.answer && d.answer.trim()) {
+          answerEl.textContent = d.answer;
+        } else if (currentSubResults && currentSubResults.length > 0) {
+          answerEl.textContent = currentSubResults.map((sr) =>
+            `${sr.index}. ${sr.period_label} holatiga ko'ra, ${sr.region}da ${sr.title} ${formatNumber(sr.value)} ${sr.unit}ni tashkil etgan [${sr.index}].`
+          ).join('\n');
+        } else {
+          answerEl.textContent = 'Bu haqda ma’lumot topilmadi.';
+        }
         const state = (d.sources ?? []).length ? 'done' : 'notfound';
         answerEl.dataset.state = state;
-        renderSources(sourcesEl, d.sources ?? []);
+        lastSources = d.sources ?? [];
+        renderSources(sourcesEl, lastSources, currentSubResults, (idx) => selectSubResult(idx), activeSubIndex);
         finish(state);
         break;
       }
 
       case 'error':
-        failActiveStages(stagesEl);
-        answerEl.textContent = `Xato: ${d.message ?? 'noma’lum'}`;
-        answerEl.dataset.state = 'error';
-        finish('error');
+        if (currentSubResults && currentSubResults.length > 0) {
+          if (!answerEl.textContent || answerEl.textContent.trim() === '') {
+            answerEl.textContent = currentSubResults.map((sr) =>
+              `${sr.index}. ${sr.period_label} holatiga ko'ra, ${sr.region}da ${sr.title} ${formatNumber(sr.value)} ${sr.unit}ni tashkil etgan [${sr.index}].`
+            ).join('\n');
+          }
+          answerEl.dataset.state = 'done';
+          finish('done');
+        } else {
+          failActiveStages(stagesEl);
+          answerEl.textContent = `Xato: ${d.message ?? 'noma’lum'}`;
+          answerEl.dataset.state = 'error';
+          finish('error');
+        }
         break;
     }
   }
@@ -641,15 +727,31 @@ export function initAskView({ scene, inspector, demo = null }) {
     try {
       await ask(question, (name, data) => {
         if (name === 'done' || name === 'error') finished = true;
-        handleEvent(name, data);
+        try {
+          handleEvent(name, data);
+        } catch (eventErr) {
+          console.warn(`[askView] Event handling warning for ${name}:`, eventErr);
+        }
       });
       if (!finished) handleEvent('error', { message: 'oqim "done" voqeasisiz tugadi' });
-    } catch {
-      // Qoida: backend bermagan narsa o'ylab topilmaydi
-      failActiveStages(stagesEl);
-      answerEl.textContent = 'Mavjud emas — backend javob bermadi.';
-      answerEl.dataset.state = 'error';
-      finish('error');
+    } catch (err) {
+      console.error('Error during ask:', err);
+      // Qoida: agar ma'lumotlar allaqachon muvaffaqiyatli olingan bo'lsa, o'chirib tashlamaymiz
+      if (currentSubResults && currentSubResults.length > 0) {
+        if (!answerEl.textContent || answerEl.textContent.trim() === '') {
+          answerEl.textContent = currentSubResults.map((sr) =>
+            `${sr.index}. ${sr.period_label} holatiga ko'ra, ${sr.region}da ${sr.title} ${formatNumber(sr.value)} ${sr.unit}ni tashkil etgan [${sr.index}].`
+          ).join('\n');
+        }
+        answerEl.dataset.state = 'done';
+        finish('done');
+      } else {
+        // Qoida: backend bermagan narsa o'ylab topilmaydi
+        failActiveStages(stagesEl);
+        answerEl.textContent = 'Mavjud emas — backend javob bermadi.';
+        answerEl.dataset.state = 'error';
+        finish('error');
+      }
     } finally {
       button.disabled = false;
       // Faqat manbali, to'liq javobni demo uchun saqlash mumkin
@@ -699,8 +801,8 @@ function drawBars(box, rows, main, unit) {
     const col = el('span', '', 'bar-col');
     col.style.setProperty('--h', has ? `${12 + k * 88}%` : '60%');
     col.style.setProperty('--k', k.toFixed(3));
-    const per = el('span', periodOf(r).replace(/^20/, ''), 'bar-per');
-    li.title = joinParts(periodOf(r), has ? `${formatNumber(v)} ${unit}`.trim() : 'bazada qiymat yo‘q');
+    const per = el('span', formatCompactPeriod(periodOf(r)).replace(/^20/, ''), 'bar-per');
+    li.title = joinParts(formatPeriodLabel(periodOf(r)), has ? `${formatNumber(v)} ${unit}`.trim() : 'bazada qiymat yo‘q');
     li.append(val, col, per);
     list.append(li);
   }
@@ -770,7 +872,7 @@ function renderVerification(listEl, checklist) {
   }
 }
 
-function renderSources(listEl, sources) {
+function renderSources(listEl, sources, subResults = null, onSelectSubResult = null, activeIdx = 1) {
   listEl.replaceChildren();
   for (const s of sources) {
     const li = el('li');
@@ -779,6 +881,17 @@ function renderSources(listEl, sources) {
     a.target = '_blank';
     a.rel = 'noopener';
     li.append(el('span', `[${s.n}] `), a, el('small', ` · ${s.snapshot_date}`));
+    if (subResults && subResults.some((sub) => sub.index === s.n)) {
+      li.title = `${s.name || 'Ko‘rsatkich'}ni tanlash`;
+      li.style.cursor = 'pointer';
+      if (s.n === activeIdx) {
+        li.dataset.active = 'true';
+      }
+      li.addEventListener('click', (e) => {
+        if (e.target === a) return;
+        if (onSelectSubResult) onSelectSubResult(s.n);
+      });
+    }
     listEl.append(li);
   }
 }

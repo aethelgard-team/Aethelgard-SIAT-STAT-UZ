@@ -196,9 +196,9 @@ RU_TO_UZ_TERMS = [
     (r"\bбензин[аеом]?\b", "benzin"),
 
     # Iqtisodiy va demografik ko'rsatkichlar
-    (r"\bчисленность\s+населения\b", "aholi soni"),
-    (r"\bнаселени[еяюем]\b", "aholi soni"),
-    (r"\bжителей\b", "aholi soni"),
+    (r"\bчисленность\s+населения\b", "doimiy aholi soni"),
+    (r"\bнаселени[еяюем]\b", "doimiy aholi soni"),
+    (r"\bжителей\b", "doimiy aholi soni"),
     (r"\bсреднемесячная\s+номинальная\s+заработная\s+плата\b", "o'rtacha hisoblangan oylik ish haqi"),
     (r"\bзаработная\s+плата\b", "o'rtacha hisoblangan oylik ish haqi"),
     (r"\bзарплат[аыуеой]\b", "o'rtacha hisoblangan oylik ish haqi"),
@@ -335,10 +335,15 @@ TYPO_RULES = [
     (r"\bnechpul\b", "narxi qancha"),
     (r"\bnecha\s+pul\b", "narxi qancha"),
     (r"\bnechi\s+pul\b", "narxi qancha"),
-    (r"\bodam\s+soni\b", "aholi soni"),
-    (r"\bnechta\s+odam\b", "aholi soni"),
-    (r"\bodam\s+yashaydi\b", "aholi soni"),
-    (r"\bkishi\s+yashaydi\b", "aholi soni"),
+    (r"\bdoimiy\s+aholi(?:si)?(?:\s+soni)?\b", "doimiy aholi soni"),
+    (r"\baholi(?:si)?\s+soni\b", "doimiy aholi soni"),
+    (r"\bodam\s+soni\b", "doimiy aholi soni"),
+    (r"\bnechta\s+odam\b", "doimiy aholi soni"),
+    (r"\bodam\s+yashaydi\b", "doimiy aholi soni"),
+    (r"\bkishi\s+yashaydi\b", "doimiy aholi soni"),
+    (r"\baholi(?:si)?(?!\s+zichlig)\s+(?:nechta|qancha)\b", "doimiy aholi soni"),
+    (r"\b(?:nechta|qancha)\s+aholi(?:si)?(?!\s+zichlig)\b", "doimiy aholi soni"),
+    (r"\baholi(?:si)?(?!\s+zichlig)\b", "doimiy aholi soni"),
     (r"\bo['`]?rtacha\s+(?:hisoblangan\s+)?(?:oylik\s+)?maosh\b", "o'rtacha hisoblangan oylik ish haqi"),
     (r"\bo['`]?rtacha\s+(?:hisoblangan\s+)?oylik\b", "o'rtacha hisoblangan oylik ish haqi"),
     (r"\boylik\s+maosh\b", "o'rtacha hisoblangan oylik ish haqi"),
@@ -431,6 +436,87 @@ def is_greeting_query(text: str) -> bool:
 def get_greeting_response(lang: str) -> str:
     """Mos til va alifboda samimiy salomlashuv javobini qaytaradi."""
     return GREETING_RESPONSES.get(lang, GREETING_RESPONSES["uz_latn"])
+
+
+# -----------------------------------------------------------------------------
+# 6.5. Inson Tushunadigan Davr Formatlagich (Human-Readable Period Formatting)
+# -----------------------------------------------------------------------------
+
+def format_period_label(period_code: str, lang: str = "uz_latn") -> str:
+    """
+    DWH davr kodini (2026-M09, 2025-Y00, 2026-Q03, 2025) inson tushunadigan
+    chiroyli formatga o'tkazadi.
+    """
+    if not period_code:
+        return ""
+    code = str(period_code).strip()
+
+    # 1. Oylik: YYYY-M01 .. YYYY-M12
+    m_match = re.match(r"^(\d{4})-M0?([1-9]|1[0-2])$", code, re.IGNORECASE)
+    if m_match:
+        year, month_num = m_match.group(1), int(m_match.group(2))
+        month_names_uz = {
+            1: "yanvar", 2: "fevral", 3: "mart", 4: "aprel",
+            5: "may", 6: "iyun", 7: "iyul", 8: "avgust",
+            9: "sentyabr", 10: "oktyabr", 11: "noyabr", 12: "dekabr"
+        }
+        month_names_cyrl = {
+            1: "январь", 2: "февраль", 3: "март", 4: "апрель",
+            5: "май", 6: "июнь", 7: "июль", 8: "август",
+            9: "сентябрь", 10: "октябрь", 11: "ноябрь", 12: "декабрь"
+        }
+        month_names_ru = {
+            1: "январь", 2: "февраль", 3: "март", 4: "апрель",
+            5: "май", 6: "июнь", 7: "июль", 8: "август",
+            9: "сентябрь", 10: "октябрь", 11: "ноябрь", 12: "декабрь"
+        }
+        if lang == "ru":
+            return f"{month_names_ru.get(month_num, '')} {year} года"
+        elif lang == "uz_cyrl":
+            return f"{year} йил {month_names_cyrl.get(month_num, '')} ойи"
+        else:
+            return f"{year}-yil {month_names_uz.get(month_num, '')} oyi"
+
+    # 2. Choraklik: YYYY-Q01 .. YYYY-Q04 yoki YYYY-Q1 .. YYYY-Q4
+    q_match = re.match(r"^(\d{4})-Q0?([1-4])$", code, re.IGNORECASE)
+    if q_match:
+        year, q_num = q_match.group(1), int(q_match.group(2))
+        if lang == "ru":
+            return f"{q_num}-й квартал {year} года"
+        elif lang == "uz_cyrl":
+            return f"{year} йил {q_num}-чорак"
+        else:
+            return f"{year}-yil {q_num}-chorak"
+
+    # 3. Yillik: YYYY-Y00 yoki 4 ta raqamli YYYY
+    y_match = re.match(r"^(\d{4})(?:-Y00)?$", code, re.IGNORECASE)
+    if y_match:
+        year = y_match.group(1)
+        if lang == "ru":
+            return f"{year} год"
+        elif lang == "uz_cyrl":
+            return f"{year} йил"
+        else:
+            return f"{year}-yil"
+
+    return code
+
+
+def format_compact_period(period_code: str, lang: str = "uz_latn") -> str:
+    """Grafiklar o'qi va hover uchun ixcham davr nomi (masalan, '2026 sen')."""
+    if not period_code:
+        return ""
+    code = str(period_code).strip()
+    m_match = re.match(r"^(\d{4})-M0?([1-9]|1[0-2])$", code, re.IGNORECASE)
+    if m_match:
+        year, month_num = m_match.group(1), int(m_match.group(2))
+        months_short = {
+            1: "yan", 2: "fev", 3: "mar", 4: "apr",
+            5: "may", 6: "iyn", 7: "iyl", 8: "avg",
+            9: "sen", 10: "okt", 11: "noy", 12: "dek"
+        }
+        return f"{year} {months_short.get(month_num, '')}"
+    return format_period_label(code, lang)
 
 
 # -----------------------------------------------------------------------------

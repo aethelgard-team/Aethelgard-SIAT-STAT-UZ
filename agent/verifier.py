@@ -85,6 +85,9 @@ def extract_numbers_from_text(text: str) -> List[Tuple[str, List[float]]]:
     clean_text = re.sub(r"\b1\s*(?:kg|кг|litr|литр|metr|метр|dona|дона)\b", " ", clean_text, flags=re.IGNORECASE)
     clean_text = re.sub(r"\b10\s*(?:dona|дона|dona\s+tuxum|яиц)\b", " ", clean_text, flags=re.IGNORECASE)
 
+    # Ro'yxat tartib raqamlarini (1., 2., 3., 1), 2)) statistik son emas deb olib tashlash
+    clean_text = re.sub(r"(?:^|[\r\n])\s*\d+[\.\)]\s*", " ", clean_text)
+
     pattern = re.compile(
         r"""
         (?:
@@ -176,7 +179,8 @@ def split_into_sentences(text: str) -> List[str]:
         line = line.strip()
         if not line:
             continue
-        parts = re.split(r"(?<=[.!?])\s+", line)
+        # Nuqta orqasidan harf yoki qavs bo'lsa jumla tugagan deb hisoblaymiz (1. yoki 2. kabi ro'yxat raqamlarini bo'lib yubormaymiz)
+        parts = re.split(r"(?<=[a-zA-Z\u0400-\u04FF\]\)])[.!?]\s+", line)
         for p in parts:
             p_clean = p.strip()
             if p_clean:
@@ -245,7 +249,17 @@ def verify_text(llm_text: str, tool_results: Any) -> Dict[str, Any]:
 
     # Faqat verifikatsiyadan o'tgan jumlalarni qoldirish
     surviving_sentences = [item["text"] for item in verified_sentences if item["passed"]]
-    verified_text = " ".join(surviving_sentences).strip()
+    is_list_like = len(surviving_sentences) >= 2 and any(re.match(r"^\s*(?:\d+[\.\)]|[•\-\*])\s*", s) for s in surviving_sentences)
+    if is_list_like:
+        formatted_list = []
+        for s in surviving_sentences:
+            s_clean = s.strip()
+            if not s_clean.endswith((".", "!", "?")):
+                s_clean += "."
+            formatted_list.append(s_clean)
+        verified_text = "\n".join(formatted_list)
+    else:
+        verified_text = " ".join(surviving_sentences).strip()
 
     if not verified_text and sentences:
         verified_text = "Ushbu so'rov bo'yicha bazada tasdiqlangan ma'lumot topilmadi."
