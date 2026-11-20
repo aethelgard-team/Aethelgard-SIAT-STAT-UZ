@@ -48,7 +48,7 @@ frontend/src/
 | `stage.completed` (dwh) | `dwh.fact_value · 5 qator · 8.1 ms` |
 | `tool.result` | Natija grafigi (2D) |
 | `generation.delta` | Javob so'zma-so'z paydo bo'ladi |
-| `verification.completed` | Har bir jumla: ✓ o'tdi yoki ✗ olib tashlandi (sababi bilan) |
+| `verification.completed` | Har bir jumla: [PASS] o'tdi yoki [FAIL] olib tashlandi (sababi bilan) |
 | `done` | Faqat tekshiruvdan o'tgan javob + `[1]` manba havolasi va snapshot sanasi |
 | `error` | Faol bosqichlar qizil, xato matni |
 
@@ -79,7 +79,7 @@ Backend hali lokal ishga tushirilmagani uchun, brauzerda backend formatidagi sin
 - [x] 7 ta bosqich ketma-ket yonadi, har birida haqiqiy tafsilot
 - [x] 3D'da faqat `get_data` tuguni yonadi
 - [x] Javob jonli yoziladi, `done` da tasdiqlangan javob bilan almashtiriladi
-- [x] O'tmagan jumla ✗ va sababi bilan ko'rsatiladi
+- [x] O'tmagan jumla [FAIL] va sababi bilan ko'rsatiladi
 - [x] Grafikda `null` davr bo'sh qoldi (5 davrdan 4 ta nuqta)
 - [x] "Topilmadi" holati to'g'ri ko'rinadi
 - [x] Katalog → ko'rsatkich sahifasi → grafik ishlaydi
