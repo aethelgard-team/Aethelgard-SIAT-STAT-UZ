@@ -50,31 +50,20 @@ app.add_middleware(
 app.include_router(router)
 
 # -----------------------------------------------------------------------------
-# Statik Frontend (Production SPA & Hugging Face Spaces xizmati)
+# Statik Frontend (Docker / Hugging Face Spaces uchun)
 # -----------------------------------------------------------------------------
-FRONTEND_DIST = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
-
-if os.path.exists(FRONTEND_DIST):
-    assets_dir = os.path.join(FRONTEND_DIST, "assets")
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+if os.path.exists(frontend_dist):
+    assets_dir = os.path.join(frontend_dist, "assets")
     if os.path.exists(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
-    @app.get("/", include_in_schema=False)
-    async def serve_index():
-        index_file = os.path.join(FRONTEND_DIST, "index.html")
-        if os.path.exists(index_file):
-            return FileResponse(index_file)
-        return {"message": "Frontend build not found"}
-
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
-        candidate = os.path.join(FRONTEND_DIST, full_path)
-        if os.path.isfile(candidate):
-            return FileResponse(candidate)
-        index_file = os.path.join(FRONTEND_DIST, "index.html")
-        if os.path.exists(index_file):
-            return FileResponse(index_file)
-        return {"error": "Not Found"}
+        file_path = os.path.join(frontend_dist, full_path)
+        if full_path and os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_dist, "index.html"))
 
 
 if __name__ == "__main__":

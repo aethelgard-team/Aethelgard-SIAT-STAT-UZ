@@ -81,6 +81,10 @@ def extract_numbers_from_text(text: str) -> List[Tuple[str, List[float]]]:
     # Manba havolalarini ([1], [2], [1, 2]) olib tashlash
     clean_text = re.sub(r"\[\s*\d+(?:\s*,\s*\d+)*\s*\]", " ", text)
 
+    # Qadoq/o'lchov birligi miqdorlarini (1 kg, 1 кг, 10 dona, 10 дона, 1 litr) statistik qiymat emas deb e'tibordan chetda qoldirish
+    clean_text = re.sub(r"\b1\s*(?:kg|кг|litr|литр|metr|метр|dona|дона)\b", " ", clean_text, flags=re.IGNORECASE)
+    clean_text = re.sub(r"\b10\s*(?:dona|дона|dona\s+tuxum|яиц)\b", " ", clean_text, flags=re.IGNORECASE)
+
     pattern = re.compile(
         r"""
         (?:
@@ -125,13 +129,17 @@ def collect_dwh_numbers(tool_data: Any) -> Set[float]:
         if obj is None:
             return
         elif isinstance(obj, (int, float)):
-            numbers.add(float(obj))
+            f_val = float(obj)
+            numbers.add(f_val)
+            numbers.add(abs(f_val))
         elif isinstance(obj, str):
             # Qatordagi sonlarni ham tekshirish (masalan: '127857.3', '2026-M09')
             # Yil va oylarni ajratish
             for m in re.findall(r"\d+(?:\.\d+)?", obj):
                 try:
-                    numbers.add(float(m))
+                    f_val = float(m)
+                    numbers.add(f_val)
+                    numbers.add(abs(f_val))
                 except ValueError:
                     pass
         elif isinstance(obj, dict):
@@ -150,9 +158,9 @@ def is_number_in_dwh(number: float, dwh_numbers: Set[float], tolerance: float = 
     Berilgan raqam DWH raqamlari to'plamida mavjudligini tekshiradi (kichik xatolik chegarasi bilan).
     """
     for dwh_num in dwh_numbers:
-        if abs(number - dwh_num) <= tolerance:
+        if abs(number - dwh_num) <= tolerance or abs(abs(number) - abs(dwh_num)) <= tolerance:
             return True
-        if dwh_num != 0 and abs((number - dwh_num) / dwh_num) < 0.001:
+        if dwh_num != 0 and (abs((number - dwh_num) / dwh_num) < 0.001 or abs((abs(number) - abs(dwh_num)) / dwh_num) < 0.001):
             return True
     return False
 
