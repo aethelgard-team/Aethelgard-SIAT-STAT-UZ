@@ -13,7 +13,7 @@ Tavsif:
 """
 
 import re
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from mcp_server.db import get_db_cursor
 
 # Kichik so'zlashuv lug'ati (Tez-tez uchraydigan sinonimlar)

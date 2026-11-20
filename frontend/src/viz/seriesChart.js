@@ -1,7 +1,7 @@
 // 2D SVG grafik. WebGL kerak emas — har qanday brauzerda ishlaydi.
 // rows: backenddan kelgan qatorlar [{ period_key, value, item_name, status }]
 // Qoida: faqat haqiqiy qiymat chiziladi; value = null bo'lsa nuqta qo'yilmaydi.
-import { formatNumber, el } from '../core/format.js';
+import { formatNumber, el, formatPeriodLabel, formatCompactPeriod } from '../core/format.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const W = 640, H = 260, PAD = { l: 70, r: 16, t: 16, b: 40 };
@@ -40,7 +40,7 @@ export function renderSeriesChart(container, rows, { unit = '', sourceUrl = '' }
   if (series.length === 1) {
     const r = series[0];
     const card = el('div', null, 'value-card');
-    card.append(el('strong', formatNumber(r.value)), el('span', `${r.period_key} · status: ${r.status}`));
+    card.append(el('strong', formatNumber(r.value)), el('span', `${formatPeriodLabel(r.period_key)} · status: ${r.status}`));
     container.append(card);
     appendSource(container, sourceUrl);
     return;
@@ -76,7 +76,7 @@ export function renderSeriesChart(container, rows, { unit = '', sourceUrl = '' }
   }
   for (const i of [0, series.length - 1]) {
     const t = svgEl('text', { x: x(i), y: H - PAD.b + 18, 'text-anchor': i === 0 ? 'start' : 'end', class: 'tick' });
-    t.textContent = series[i].period_key;
+    t.textContent = formatCompactPeriod(series[i].period_key);
     svg.append(t);
   }
 
@@ -95,7 +95,7 @@ export function renderSeriesChart(container, rows, { unit = '', sourceUrl = '' }
     if (r.value === null || r.value === undefined) return;
     const dot = svgEl('circle', { cx: x(i), cy: y(r.value), r: 3.5, class: 'dot' });
     const tip = svgEl('title');
-    tip.textContent = `${r.period_key}: ${formatNumber(r.value)}${unit ? ` ${unit}` : ''}`;
+    tip.textContent = `${formatPeriodLabel(r.period_key)}: ${formatNumber(r.value)}${unit ? ` ${unit}` : ''}`;
     dot.append(tip);
     svg.append(dot);
   });

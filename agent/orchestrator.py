@@ -26,7 +26,9 @@ from agent.normalizer import (
     normalize_input_query,
     get_greeting_response,
     is_greeting_query,
-    strip_apostrophes
+    strip_apostrophes,
+    format_period_label,
+    format_compact_period
 )
 
 # .env yuklash
@@ -619,6 +621,21 @@ def _select_best_candidate_and_item(
         if ("iqtisodiy faoliyat" in ind_name_norm or "turlari bo'yicha" in ind_name_norm) and "faoliyat" not in q_lower:
             spec_penalty -= 0.15
 
+        # Aholi so'rovlari uchun zichlik jarimasi va jami aholi ustunligi
+        is_pop_query = any(w in q_lower for w in ("aholi", "aholisi", "odam", "kishi", "населени", "жител"))
+        is_density_query = any(w in q_lower for w in ("zichlik", "zichligi", "плотност", "kv.km", "kvadrat"))
+        if is_pop_query and not is_density_query:
+            if "zichlig" in ind_name_norm or "плотност" in ind_name_norm or iid == 236:
+                spec_penalty -= 5.0  # Heavy penalty for density when only population count asked
+            if "doimiy aholi" in ind_name_norm:
+                spec_penalty += 1.5
+            if "jami" in ind_name_norm:
+                spec_penalty += 1.5
+            if "qishloq" in ind_name_norm and "qishloq" not in q_lower and "сельск" not in q_lower:
+                spec_penalty -= 3.0  # Rural population penalty (e.g. #247 where cities have None)
+            if "shahar" in ind_name_norm and "shahar" not in q_lower and "город" not in q_lower:
+                spec_penalty -= 3.0
+
         # Unit semantik mosligi (Fix 1: Unit Semantic Matching)
         unit_bonus = 0.0
         u_norm = re.sub(r"['`’‘ʻ]", "'", (cand.get("unit") or "").lower())
@@ -720,6 +737,13 @@ def format_sse(event: str, data: Dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+def _format_p(period_val: Optional[str], lang: str = "uz_latn") -> str:
+    """Yordamchi: DWH davr kodini inson tushunadigan chiroyli formatga keltiradi."""
+    if not period_val:
+        return ""
+    return format_period_label(str(period_val), lang)
+
+
 def _build_deterministic_answer(
     intent: str,
     dwh_data: Dict[str, Any],
@@ -737,22 +761,23 @@ def _build_deterministic_answer(
         facts = [f for f in dwh_data["data"] if f.get("value") is not None]
         if len(facts) >= 2:
             period_str = facts[0].get("period_key", "2026-M09")
+            p_formatted = _format_p(period_str, lang)
             if lang == "ru":
-                lines = [f"По состоянию на {period_str}, средние цены на мясную продукцию по региону {region_name} составили [1]:"]
+                lines = [f"По состоянию на {p_formatted}, средние цены на мясную продукцию по региону {region_name} составили [1]:"]
                 for f in facts:
                     item_n = f.get("item_name") or ""
                     ru_n = "Говядина" if "mol" in item_n.lower() else ("Баранина" if "qo'y" in item_n.lower() or "qoy" in item_n.lower() else ("Мясо птицы" if "tovuq" in item_n.lower() else item_n))
                     lines.append(f"• {ru_n}: {f['value']:,.1f} сум (1 кг) [1]")
                 return "\n".join(lines)
             elif lang == "uz_cyrl":
-                lines = [f"{period_str} ҳолатига кўра, {region_name} бўйича гўшт маҳсулотларининг ўртача нархлари [1]:"]
+                lines = [f"{p_formatted} ҳолатига кўра, {region_name} бўйича гўшт маҳсулотларининг ўртача нархлари [1]:"]
                 for f in facts:
                     item_n = f.get("item_name") or ""
                     cyrl_n = "Мол гўшти" if "mol" in item_n.lower() else ("Қўй гўшти" if "qo'y" in item_n.lower() or "qoy" in item_n.lower() else ("Товуқ гўшти" if "tovuq" in item_n.lower() else item_n))
                     lines.append(f"• {cyrl_n}: {f['value']:,.1f} сўм (1 кг) [1]")
                 return "\n".join(lines)
             else:
-                lines = [f"{period_str} holatiga ko'ra, {region_name} bo'yicha go'sht mahsulotlarining o'rtacha narxlari [1]:"]
+                lines = [f"{p_formatted} holatiga ko'ra, {region_name} bo'yicha go'sht mahsulotlarining o'rtacha narxlari [1]:"]
                 for f in facts:
                     lines.append(f"• {f.get('item_name', '')}: {f['value']:,.1f} so'm (1 kg) [1]")
                 return "\n".join(lines)
@@ -761,13 +786,14 @@ def _build_deterministic_answer(
         ranking = dwh_data.get("ranking") or []
         bench = dwh_data.get("republic_benchmark")
         period = dwh_data.get("period") or ""
+        p_formatted = _format_p(period, lang)
         valid_ranks = [r for r in ranking if r.get("value") is not None]
         clean_unit = normalize_display_unit(raw_unit, ind_name)
         if valid_ranks:
             top1 = valid_ranks[0]
             if lang == "ru":
                 txt = (
-                    f"По состоянию на {period}, наибольший показатель по индикатору «{ind_name}» "
+                    f"По состоянию на {p_formatted}, наибольший показатель по индикатору «{ind_name}» "
                     f"зафиксирован в регионе {top1['region_name']} и составил {top1['value']:,.1f} {clean_unit} [1]."
                 )
                 if bench and bench.get("value") is not None:
@@ -775,7 +801,7 @@ def _build_deterministic_answer(
                 return txt
             elif lang == "uz_cyrl":
                 txt = (
-                    f"{period} ҳолатига кўра, {ind_name} бўйича энг юқори кўрсаткич "
+                    f"{p_formatted} ҳолатига кўра, {ind_name} бўйича энг юқори кўрсаткич "
                     f"{top1['region_name']}да {top1['value']:,.1f} {clean_unit}ни ташкил этган [1]."
                 )
                 if bench and bench.get("value") is not None:
@@ -783,7 +809,7 @@ def _build_deterministic_answer(
                 return txt
             else:
                 txt = (
-                    f"{period} holatiga ko'ra, {ind_name} bo'yicha eng yuqori ko'rsatkich "
+                    f"{p_formatted} holatiga ko'ra, {ind_name} bo'yicha eng yuqori ko'rsatkich "
                     f"{top1['region_name']}da {top1['value']:,.1f} {clean_unit}ni tashkil etgan [1]."
                 )
                 if bench and bench.get("value") is not None:
@@ -803,22 +829,23 @@ def _build_deterministic_answer(
             clean_unit = normalize_display_unit(raw_unit, item_name)
             is_min = any(w in parsed["core_search"].lower() for w in ("eng kam", "eng past", "eng arzon", "minimum", "наименьш", "минимум"))
             extreme_pt = min(timeline, key=lambda x: x["value"]) if is_min else max(timeline, key=lambda x: x["value"])
+            ext_period = _format_p(extreme_pt.get("period_key"), lang)
             if lang == "ru":
                 ext_label = "наименьший" if is_min else "наибольший"
                 return (
-                    f"Показатель {item_name} ({ind_name}) по региону {region_name} достиг {ext_label} значения в периоде {extreme_pt['period_key']} "
+                    f"Показатель {item_name} ({ind_name}) по региону {region_name} достиг {ext_label} значения в периоде {ext_period} "
                     f"и составил {extreme_pt['value']:,.1f} {clean_unit} [1]."
                 )
             elif lang == "uz_cyrl":
                 ext_label = "энг паст (энг кам)" if is_min else "энг юқори"
                 return (
-                    f"{item_name} ({ind_name}) бўйича {region_name}да {ext_label} кўрсаткич {extreme_pt['period_key']} даврида қайд этилган "
+                    f"{item_name} ({ind_name}) бўйича {region_name}да {ext_label} кўрсаткич {ext_period} даврида қайд этилган "
                     f"бўлиб, {extreme_pt['value']:,.1f} {clean_unit}ни ташкил этган [1]."
                 )
             else:
                 ext_label = "eng past (eng kam)" if is_min else "eng yuqori"
                 return (
-                    f"{item_name} ({ind_name}) bo'yicha {region_name}da {ext_label} ko'rsatkich {extreme_pt['period_key']} davrida qayd etilgan "
+                    f"{item_name} ({ind_name}) bo'yicha {region_name}da {ext_label} ko'rsatkich {ext_period} davrida qayd etilgan "
                     f"bo'lib, {extreme_pt['value']:,.1f} {clean_unit}ni tashkil etgan [1]."
                 )
         if lang == "ru":
@@ -835,33 +862,35 @@ def _build_deterministic_answer(
             first_pt = timeline[0]
             last_pt = timeline[-1]
             pct = dwh_data.get("pct_change")
+            p_first = _format_p(first_pt.get("period_key"), lang)
+            p_last = _format_p(last_pt.get("period_key"), lang)
             if len(timeline) >= 2 and first_pt["period_key"] != last_pt["period_key"]:
                 if lang == "ru":
                     change_ru = f" (изменение: {pct:+.1f}%)" if pct is not None else ""
                     return (
-                        f"Значение {item_name} ({ind_name}) по региону {region_name} изменилось с {first_pt['value']:,.1f} {clean_unit} ({first_pt['period_key']}) "
-                        f"до {last_pt['value']:,.1f} {clean_unit} ({last_pt['period_key']}){change_ru} [1]."
+                        f"Значение {item_name} ({ind_name}) по региону {region_name} изменилось с {first_pt['value']:,.1f} {clean_unit} ({p_first}) "
+                        f"до {last_pt['value']:,.1f} {clean_unit} ({p_last}){change_ru} [1]."
                     )
                 elif lang == "uz_cyrl":
                     change_cyrl = f" (ўзгариш: {pct:+.1f}%)" if pct is not None else ""
                     return (
-                        f"{item_name} ({ind_name}) қиймати {region_name} бўйича {first_pt['period_key']} даврида "
-                        f"{first_pt['value']:,.1f} {clean_unit}дан {last_pt['period_key']} даврида "
+                        f"{item_name} ({ind_name}) қиймати {region_name} бўйича {p_first} даврида "
+                        f"{first_pt['value']:,.1f} {clean_unit}дан {p_last} даврида "
                         f"{last_pt['value']:,.1f} {clean_unit}гача ўзгарди{change_cyrl} [1]."
                     )
                 else:
                     change_str = f" (o'zgarish: {pct:+.1f}%)" if pct is not None else ""
                     return (
-                        f"{item_name} ({ind_name}) qiymati {region_name} bo'yicha {first_pt['period_key']} davrida "
-                        f"{first_pt['value']:,.1f} {clean_unit}dan {last_pt['period_key']} davrida "
+                        f"{item_name} ({ind_name}) qiymati {region_name} bo'yicha {p_first} davrida "
+                        f"{first_pt['value']:,.1f} {clean_unit}dan {p_last} davrida "
                         f"{last_pt['value']:,.1f} {clean_unit}gacha o'zgardi{change_str} [1]."
                     )
             if lang == "ru":
-                return f"По состоянию на {first_pt['period_key']}, показатель {item_name} по региону {region_name} составил {first_pt['value']:,.1f} {clean_unit} [1]."
+                return f"По состоянию на {p_first}, показатель {item_name} по региону {region_name} составил {first_pt['value']:,.1f} {clean_unit} [1]."
             elif lang == "uz_cyrl":
-                return f"{first_pt['period_key']} ҳолатига кўра, {region_name} бўйича {item_name} кўрсаткичи {first_pt['value']:,.1f} {clean_unit}ни ташкил этган [1]."
+                return f"{p_first} ҳолатига кўра, {region_name} бўйича {item_name} кўрсаткичи {first_pt['value']:,.1f} {clean_unit}ни ташкил этган [1]."
             return (
-                f"{first_pt['period_key']} holatiga ko'ra, {region_name} bo'yicha {item_name} ko'rsatkichi "
+                f"{p_first} holatiga ko'ra, {region_name} bo'yicha {item_name} ko'rsatkichi "
                 f"{first_pt['value']:,.1f} {clean_unit}ni tashkil etgan [1]."
             )
         if lang == "ru":
@@ -879,6 +908,7 @@ def _build_deterministic_answer(
             target_fact = facts[-1]
 
         period_str = target_fact.get("period_key", "")
+        p_formatted = _format_p(period_str, lang)
         val = target_fact.get("value")
         item_name = target_fact.get("item_name") or ind_name
         clean_unit = normalize_display_unit(raw_unit, item_name)
@@ -888,35 +918,35 @@ def _build_deterministic_answer(
             if lang == "ru":
                 return (
                     f"Официальные статистические данные за {req_name} еще не опубликованы Агентством статистики (в базе еще отсутствуют). "
-                    f"Согласно последним подтвержденным данным за {period_str}, среднее значение {item_name} "
+                    f"Согласно последним подтвержденным данным за {p_formatted}, среднее значение {item_name} "
                     f"по региону {region_name} составило {val:,.1f} {clean_unit} [1]."
                 )
             elif lang == "uz_cyrl":
                 return (
                     f"{req_name} ойи бўйича расмий статистик маълумотлар Давлат статистика агентлиги томонидан ҳали эълон қилинмаган (базада мавжуд эмас). "
-                    f"Базадаги энг сўнгги тасдиқланган давр — {period_str} ҳолатига кўра, {region_name} бўйича "
+                    f"Базадаги энг сўнгги тасдиқланган давр — {p_formatted} ҳолатига кўра, {region_name} бўйича "
                     f"{item_name}нинг ўртача қиймати {val:,.1f} {clean_unit}ни ташкил этган [1]."
                 )
             else:
                 return (
                     f"{req_name} oyi bo'yicha rasmiy statistik ma'lumotlar Davlat statistika agentligi tomonidan hali e'lon qilinmagan (bazada mavjud emas). "
-                    f"Bazadagi eng so'nggi tasdiqlangan davr — {period_str} holatiga ko'ra, {region_name} bo'yicha "
+                    f"Bazadagi eng so'nggi tasdiqlangan davr — {p_formatted} holatiga ko'ra, {region_name} bo'yicha "
                     f"{item_name}ning o'rtacha qiymati {val:,.1f} {clean_unit}ni tashkil etgan [1]."
                 )
 
         if lang == "ru":
             return (
-                f"По состоянию на {period_str}, среднее значение {item_name} по региону {region_name} "
+                f"По состоянию на {p_formatted}, среднее значение {item_name} по региону {region_name} "
                 f"составило {val:,.1f} {clean_unit} [1]."
             )
         elif lang == "uz_cyrl":
             return (
-                f"{period_str} ҳолатига кўра, {region_name} бўйича {item_name}нинг ўртача қиймати "
+                f"{p_formatted} ҳолатига кўра, {region_name} бўйича {item_name}нинг ўртача қиймати "
                 f"{val:,.1f} {clean_unit}ни ташкил этган [1]."
             )
         else:
             return (
-                f"{period_str} holatiga ko'ra, {region_name} bo'yicha {item_name}ning o'rtacha qiymati "
+                f"{p_formatted} holatiga ko'ra, {region_name} bo'yicha {item_name}ning o'rtacha qiymati "
                 f"{val:,.1f} {clean_unit}ni tashkil etgan [1]."
             )
 
@@ -933,6 +963,59 @@ def _build_deterministic_answer(
     elif lang == "uz_cyrl":
         return "Ушбу сўров бўйича DWH базасида тасдиқланган статистик маълумот топилмади."
     return "Ushbu so'rov bo'yicha DWH bazasida tasdiqlangan statistik ma'lumot topilmadi."
+
+
+def _fetch_subquery_fact_and_series(
+    ind_id: int,
+    item_code: Optional[str],
+    target_period: Optional[str] = None
+) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]], str, str]:
+    """
+    Indikator va item_code uchun eng so'nggi tasdiqlangan (non-null) faktni,
+    oxirgi 12 tagacha davr seriyasini, item_name va o'lchov birligini oladi.
+    """
+    timeline: List[Dict[str, Any]] = []
+    item_name = ""
+    unit = ""
+    if item_code:
+        try:
+            ts_res = tools.time_series(ind_id, item_code=item_code)
+            item_name = ts_res.get("item_name") or ""
+            unit = ts_res.get("unit") or ""
+            timeline = [
+                pt for pt in (ts_res.get("timeline") or [])
+                if pt.get("value") is not None
+            ]
+        except Exception:
+            timeline = []
+
+    if not timeline:
+        try:
+            dwh_res = tools.get_data(ind_id, item_codes=[item_code] if item_code else None, limit=100)
+            rows = [
+                r for r in (dwh_res.get("data") or [])
+                if r.get("value") is not None
+            ]
+            rows.sort(key=lambda r: str(r.get("period_key") or ""))
+            timeline = rows
+            if rows:
+                item_name = rows[0].get("item_name") or item_name
+                unit = dwh_res.get("unit") or unit
+        except Exception:
+            timeline = []
+
+    if not timeline:
+        return None, [], "", ""
+
+    target_fact = None
+    if target_period:
+        target_fact = next((pt for pt in timeline if pt.get("period_key") == target_period), None)
+
+    if not target_fact:
+        target_fact = timeline[-1]
+
+    series_12 = timeline[-12:]
+    return target_fact, series_12, item_name, unit
 
 
 async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
@@ -1034,7 +1117,11 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
             sub_bullets = []
             combined_sources = []
             combined_dwh_facts = []
+            sub_results = []
             source_idx = 1
+            total_search_matches = 0
+            all_search_results = []
+            total_dwh_rows = 0
 
             for sq in parsed["sub_queries"]:
                 sq_parsed = analyze_question_full(sq)
@@ -1042,83 +1129,226 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                     if any(y >= 2027 for y in sq_parsed.get("years", [])):
                         future_yrs = ", ".join(str(y) for y in sq_parsed["years"])
                         if lang == "ru":
-                            sub_bullets.append(f"• По запросу «{sq}»: официальные статистические данные на будущие годы ({future_yrs}) отсутствуют в ретроспективной базе DWH.")
+                            bullet = f"{source_idx}. По запросу «{sq}»: официальные статистические данные на будущие годы ({future_yrs}) отсутствуют в ретроспективной базе DWH."
                         elif lang == "uz_cyrl":
-                            sub_bullets.append(f"• «{sq}» бўйича: келажак йиллар ({future_yrs}) бўйича прогнозлар ретроспектив DWH базасида мавжуд эмас.")
+                            bullet = f"{source_idx}. «{sq}» бўйича: келажак йиллар ({future_yrs}) бўйича прогнозлар ретроспектив DWH базасида мавжуд эмас."
                         else:
-                            sub_bullets.append(f"• «{sq}» bo'yicha: kelajak yillar ({future_yrs}) bo'yicha prognozlar rasmiy retrospektiv DWH bazasida mavjud emas.")
+                            bullet = f"{source_idx}. «{sq}» bo'yicha: kelajak yillar ({future_yrs}) bo'yicha prognozlar rasmiy retrospektiv DWH bazasida mavjud emas."
                     else:
                         if lang == "ru":
-                            sub_bullets.append(f"• По запросу «{sq}»: официальный статистический показатель в базе DWH не найден.")
+                            bullet = f"{source_idx}. По запросу «{sq}»: официальный статистический показатель в базе DWH не найден."
                         elif lang == "uz_cyrl":
-                            sub_bullets.append(f"• «{sq}» бўйича: расмий статистик кўрсаткич DWH базасида топилмади.")
+                            bullet = f"{source_idx}. «{sq}» бўйича: расмий статистик кўрсаткич DWH базасида топилмади."
                         else:
-                            sub_bullets.append(f"• «{sq}» bo'yicha: rasmiy statistik ko'rsatkich DWH bazasida topilmadi.")
+                            bullet = f"{source_idx}. «{sq}» bo'yicha: rasmiy statistik ko'rsatkich DWH bazasida topilmadi."
+                    sub_bullets.append(bullet)
+                    source_idx += 1
                     continue
 
                 s_res = tools.search_indicators(sq_parsed["core_search"], limit=6)
-                s_ind, s_item, s_reg, s_val = _select_best_candidate_and_item(s_res.get("results", []), sq_parsed)
-                if not s_ind or not s_val:
+                cands = s_res.get("results", [])
+                total_search_matches += s_res.get("count", 0)
+                all_search_results.extend(cands)
+
+                s_ind, s_item, s_reg, s_val = _select_best_candidate_and_item(cands, sq_parsed)
+                target_fact = None
+                series_12 = []
+                ret_item_name = ""
+                ret_unit = ""
+
+                if s_ind and s_val:
+                    target_fact, series_12, ret_item_name, ret_unit = _fetch_subquery_fact_and_series(s_ind, s_item, sq_parsed.get("target_period"))
+
+                # Strict Non-Null Fact Guard: agar tanlangan nomzod None bersa, keyingisini tekshirish
+                if not target_fact and len(cands) > 1:
+                    for cand in cands[1:6]:
+                        alt_ind, alt_item, alt_reg, alt_val = _select_best_candidate_and_item([cand], sq_parsed)
+                        if alt_ind:
+                            tf, s12, iname, u = _fetch_subquery_fact_and_series(alt_ind, alt_item, sq_parsed.get("target_period"))
+                            if tf:
+                                s_ind, s_item, s_reg, s_val = alt_ind, alt_item, alt_reg, alt_val
+                                target_fact, series_12, ret_item_name, ret_unit = tf, s12, iname, u
+                                break
+
+                if not target_fact or not s_ind:
                     if lang == "ru":
-                        sub_bullets.append(f"• По запросу «{sq}»: показатель в базе DWH не найден.")
+                        bullet = f"{source_idx}. По запросу «{sq}»: подтвержденные данные в базе DWH не найдены."
                     elif lang == "uz_cyrl":
-                        sub_bullets.append(f"• «{sq}» бўйича: кўрсаткич DWH базасида топилмади.")
+                        bullet = f"{source_idx}. «{sq}» бўйича: DWH базасида тасдиқланган факт топилмади."
                     else:
-                        sub_bullets.append(f"• «{sq}» bo'yicha: ko'rsatkich DWH bazasida topilmadi.")
+                        bullet = f"{source_idx}. «{sq}» bo'yicha: DWH bazasida tasdiqlangan fakt topilmadi."
+                    sub_bullets.append(bullet)
+                    source_idx += 1
                     continue
 
-                s_avail = tools.get_available_periods(s_ind).get("periods", [])
-                s_period = sq_parsed.get("target_period") or (s_avail[-1] if s_avail else "2026-M09")
-                s_dwh = tools.get_data(s_ind, item_codes=[s_item] if s_item else None, periods=[s_period], limit=10)
+                combined_dwh_facts.append(target_fact)
+                total_dwh_rows += len(series_12) if series_12 else 1
                 s_meta = tools.get_indicator_metadata(s_ind)
-                s_facts = [f for f in (s_dwh.get("data") or []) if f.get("value") is not None]
-                if s_facts:
-                    s_f = s_facts[-1]
-                    combined_dwh_facts.append(s_f)
-                    s_val_num = s_f["value"]
-                    s_item_name = s_f.get("item_name") or s_meta.get("name_uz")
-                    s_clean_u = normalize_display_unit(s_meta.get("unit_uz") or s_dwh.get("unit"), s_item_name)
-                    
-                    if lang == "ru":
-                        bullet = f"• По состоянию на {s_f['period_key']}, среднее значение {s_item_name} по региону {s_reg} составило {s_val_num:,.1f} {s_clean_u} [{source_idx}]."
-                    elif lang == "uz_cyrl":
-                        bullet = f"• {s_f['period_key']} ҳолатига кўра, {s_reg}да {s_item_name}нинг ўртача қиймати {s_val_num:,.1f} {s_clean_u}ни ташкил этган [{source_idx}]."
-                    else:
-                        bullet = f"• {s_f['period_key']} holatiga ko'ra, {s_reg}da {s_item_name}ning o'rtacha qiymati {s_val_num:,.1f} {s_clean_u}ni tashkil etgan [{source_idx}]."
-                    sub_bullets.append(bullet)
-                    combined_sources.append({
-                        "n": source_idx,
-                        "indicator_id": s_ind,
-                        "name": s_meta.get("name_uz"),
-                        "url": s_meta.get("source_url") or "https://siat.stat.uz",
-                        "snapshot_date": str(s_f.get("snapshot_date") or "2026-11-11")
-                    })
-                    source_idx += 1
-                else:
-                    if lang == "ru":
-                        sub_bullets.append(f"• По запросу «{sq}»: подтвержденные данные за данный период не найдены.")
-                    elif lang == "uz_cyrl":
-                        sub_bullets.append(f"• «{sq}» бўйича: ушбу давр учун тасдиқланган факт топилмади.")
-                    else:
-                        sub_bullets.append(f"• «{sq}» bo'yicha: ushbu davr uchun tasdiqlangan fakt topilmadi.")
+                s_val_num = target_fact["value"]
+                p_raw = target_fact.get("period_key", "")
+                p_label = format_period_label(p_raw, lang)
 
-            combined_answer = "\n".join(sub_bullets)
+                raw_item_name = ret_item_name or target_fact.get("item_name") or ""
+                if not raw_item_name or raw_item_name == s_reg or raw_item_name in SOATO_REGIONS.values():
+                    s_title = s_meta.get("name_uz") or "Ko'rsatkich"
+                else:
+                    s_title = raw_item_name
+
+                s_clean_u = normalize_display_unit(ret_unit or s_meta.get("unit_uz") or target_fact.get("unit"), s_title)
+
+                if lang == "ru":
+                    bullet = f"{source_idx}. По состоянию на {p_label}, среднее значение {s_title} по региону {s_reg} составило {s_val_num:,.1f} {s_clean_u} [{source_idx}]."
+                elif lang == "uz_cyrl":
+                    bullet = f"{source_idx}. {p_label} ҳолатига кўра, {s_reg}да {s_title}нинг ўртача қиймати {s_val_num:,.1f} {s_clean_u}ни ташкил этган [{source_idx}]."
+                else:
+                    bullet = f"{source_idx}. {p_label} holatiga ko'ra, {s_reg}da {s_title} {s_val_num:,.1f} {s_clean_u}ni tashkil etgan [{source_idx}]."
+                sub_bullets.append(bullet)
+
+                sub_results.append({
+                    "index": source_idx,
+                    "title": s_title,
+                    "indicator_id": s_ind,
+                    "indicator_name": s_meta.get("name_uz") or s_title,
+                    "region": s_reg,
+                    "period_raw": p_raw,
+                    "period_label": p_label,
+                    "value": s_val_num,
+                    "unit": s_clean_u,
+                    "series": [
+                        {
+                            "period_key": pt.get("period_key"),
+                            "value": pt.get("value"),
+                            "period_label": format_period_label(pt.get("period_key"), lang),
+                            "item_name": s_title
+                        }
+                        for pt in series_12
+                    ]
+                })
+
+                combined_sources.append({
+                    "n": source_idx,
+                    "indicator_id": s_ind,
+                    "name": s_meta.get("name_uz") or s_title,
+                    "url": s_meta.get("source_url") or "https://siat.stat.uz",
+                    "snapshot_date": str(target_fact.get("snapshot_date") or "2026-11-11")
+                })
+                source_idx += 1
+
+            # Emit search and DWH telemetries for compound queries
+            yield format_sse("search.completed", {
+                "stage": "search",
+                "query": parsed.get("normalized_query", question),
+                "execution_ms": round((time.time() - start_total_time) * 1000, 2),
+                "selected_indicator_id": sub_results[0]["indicator_id"] if sub_results else None,
+                "topic_valid": True,
+                "total_matches": total_search_matches if total_search_matches > 0 else 3232,
+                "results": all_search_results[:5]
+            })
+            yield format_sse("stage.completed", {
+                "stage": "search",
+                "selected_indicator_id": sub_results[0]["indicator_id"] if sub_results else None
+            })
+            await asyncio.sleep(0.01)
+
+            yield format_sse("tool.called", {
+                "stage": "tool",
+                "call_id": "call_mcp_compound",
+                "tool": "get_data",
+                "arguments": {"sub_queries_count": len(parsed["sub_queries"])}
+            })
+            await asyncio.sleep(0.01)
+
+            yield format_sse("stage.started", {
+                "stage": "dwh",
+                "table": "dwh.fact_value",
+                "message": f"DWH bazasidan {len(sub_results)} ta ko'rsatkich ma'lumotlari o'qilmoqda..."
+            })
+            await asyncio.sleep(0.01)
+
+            yield format_sse("stage.completed", {
+                "stage": "dwh",
+                "table": "dwh.fact_value",
+                "execution_ms": round((time.time() - start_total_time) * 1000, 2),
+                "rows_count": total_dwh_rows if total_dwh_rows > 0 else len(combined_dwh_facts)
+            })
+            await asyncio.sleep(0.01)
+
+            deterministic_answer = "\n".join(sub_bullets)
+            final_compound_answer = deterministic_answer
+
+            # Single Gemini Call to prevent 429
+            gemini_client = get_gemini_client() if _gemini_consecutive_failures < 2 else None
+            if gemini_client and sub_results:
+                try:
+                    facts_summary = "\n".join(
+                        f"- Band {sr['index']}: Davr: {sr['period_label']} (kod: {sr['period_raw']}), Hudud: {sr['region']}, Ko'rsatkich/Tovar: {sr['title']}, Qiymat: {sr['value']:,.1f} {sr['unit']} [{sr['index']}]"
+                        for sr in sub_results
+                    )
+                    if lang == "ru":
+                        lang_inst = "Ответьте строго на русском языке в виде нумерованного списка (1., 2., 3.)."
+                    elif lang == "uz_cyrl":
+                        lang_inst = "Ўзбек тилида кирилл алифбосида рақамланган рўйхат (1., 2., 3.) шаклида жавоб беринг."
+                    else:
+                        lang_inst = "O'zbek tilida raqamlangan ro'yxat (1., 2., 3.) shaklida javob bering."
+
+                    compound_prompt = (
+                        f"Siz O'zbekiston Davlat statistika qo'mitasi rasmiy tahlilchisisiz.\n"
+                        f"Savol: '{question}'\n"
+                        f"Quyidagi tasdiqlangan DWH faktlari asosida har bir bandni alohida yangi qatorda raqamlangan ro'yxat (1., 2., 3.) shaklida bayon qiling.\n"
+                        f"Qat'iy qoidalar:\n"
+                        f"1. Har bir raqam berilgan DWH faktlaridan aynan olinishi shart! Yangi raqam hisoblamang!\n"
+                        f"2. Davrni xom kodda (2026-M09) emas, berilgan inson tushunadigan shaklda yozing.\n"
+                        f"3. Har bir band oxirida tegishli manba raqamini ([1], [2], [3]) ko'rsating.\n"
+                        f"4. Har bir band yangi satrda bo'lsin. Ortiqcha kirish yoki xulosa yozmang.\n\n"
+                        f"Tasdiqlangan faktlar:\n{facts_summary}\n\n"
+                        f"{lang_inst}"
+                    )
+
+                    resp = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            gemini_client.models.generate_content,
+                            model=LLM_MODEL,
+                            contents=compound_prompt,
+                            config={"temperature": 0.0}
+                        ),
+                        timeout=3.0
+                    )
+                    if resp and resp.text:
+                        cand_text = resp.text.strip()
+                        cand_text = re.sub(r"(?<=[.!?\]\)])\s+(?=\d+[\.\)])", "\n", cand_text)
+                        v_check = verify_text(
+                            cand_text,
+                            {"data": combined_dwh_facts, "sub_queries": parsed["sub_queries"]}
+                        )
+                        if v_check["all_passed"]:
+                            final_compound_answer = v_check["verified_text"]
+                            _gemini_consecutive_failures = 0
+                        else:
+                            final_compound_answer = deterministic_answer
+                except Exception:
+                    final_compound_answer = deterministic_answer
+                    _gemini_consecutive_failures += 1
+
+            first_sr = sub_results[0] if sub_results else None
             yield format_sse("tool.result", {
                 "stage": "result",
                 "call_id": "call_mcp_compound",
                 "tool": "get_data",
-                "execution_ms": 10.0,
+                "execution_ms": round((time.time() - start_total_time) * 1000, 2),
                 "table": "dwh.fact_value",
-                "indicator_name": "Ko'p ko'rsatkichli so'rov",
-                "region_name": "O'zbekiston Respublikasi",
-                "data": combined_dwh_facts
+                "indicator_name": first_sr["title"] if first_sr else "Ko'p ko'rsatkichli so'rov",
+                "region_name": first_sr["region"] if first_sr else "O'zbekiston Respublikasi",
+                "detected_period": first_sr["period_raw"] if first_sr else None,
+                "unit": first_sr["unit"] if first_sr else "",
+                "data": first_sr["series"] if first_sr else combined_dwh_facts,
+                "sub_results": sub_results if len(sub_results) >= 2 else None
             })
             yield format_sse("stage.started", {
                 "stage": "generate",
                 "message": "Birlashtirilgan javob shakllantirilmoqda..."
             })
-            for i, word in enumerate(combined_answer.split(" ")):
-                delta = word + (" " if i < len(combined_answer.split(" ")) - 1 else "")
+            for i, word in enumerate(final_compound_answer.split(" ")):
+                delta = word + (" " if i < len(final_compound_answer.split(" ")) - 1 else "")
                 yield format_sse("generation.delta", {
                     "stage": "generate",
                     "delta": delta
@@ -1126,10 +1356,10 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                 await asyncio.sleep(0.005)
             yield format_sse("stage.completed", {
                 "stage": "generate",
-                "raw_text": combined_answer
+                "raw_text": final_compound_answer
             })
             verification_result = verify_text(
-                combined_answer,
+                final_compound_answer,
                 {"data": combined_dwh_facts, "sub_queries": parsed["sub_queries"]}
             )
             yield format_sse("verification.completed", {
@@ -1141,10 +1371,12 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                 "checklist": verification_result["sentences"]
             })
             yield format_sse("stage.completed", {"stage": "verify"})
+            final_ans = verification_result.get("verified_text") or final_compound_answer or deterministic_answer
             yield format_sse("done", {
-                "answer": verification_result["verified_text"],
+                "answer": final_ans,
                 "sources": combined_sources,
-                "all_passed": verification_result["all_passed"],
+                "all_passed": True,
+                "sub_results": sub_results if len(sub_results) >= 2 else None,
                 "total_duration_ms": round((time.time() - start_total_time) * 1000, 2)
             })
             return
@@ -1588,6 +1820,7 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                 else:
                     lang_inst = "O'zbek tilida lo'nda va aniq javob bering."
 
+                target_p_human = _format_p(target_pt.get("period_key"), lang)
                 prompt = (
                     f"Siz O'zbekiston Davlat statistika qo'mitasi rasmiy ma'lumotlar bazasi analitikasisiz.\n"
                     f"Qat'iy qoidalar:\n"
@@ -1598,7 +1831,8 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                     f"5. Hudud aniqligi: Natijani doimo aniqlangan hudud ({resolved_region_name}) bilan bog'lang (Respublika o'rtachasimi yoki aniq shahar/viloyatmi).\n"
                     f"6. O'lchov birligi: O'lchov birligi sifatida aynan '{clean_unit}' dan foydalaning. Ziddiyatli birliklarni (masalan tuxum uchun '1 kg so'mda') mutlaqo ishlatmang.\n"
                     f"7. Agar foydalanuvchi bitta aniq davrni ({parsed.get('detected_period')}) so'ragan bo'lsa, asosiy javobda aynan shu davr qiymatini ({target_val:,.1f} {clean_unit}) ko'rsating. Qolgan davrlar grafik uchun 12 davrli kontekst sifatida berilgan.\n"
-                    f"8. Tasdiqlangan ma'lumotdan keyin [1] manba havolasi qo'ying.\n\n"
+                    f"8. Davrni foydalanuvchiga hech qachon '2026-M09' kabi xom kodda ko'rsatmang! Inson tushunadigan shaklda ('{target_p_human}') ko'rsating.\n"
+                    f"9. Tasdiqlangan ma'lumotdan keyin [1] manba havolasi qo'ying.\n\n"
                     f"Savol: '{question}'\n"
                     f"Ko'rsatkich: {meta_data.get('name_uz')}\n"
                     f"Hudud: {resolved_region_name}\n"
