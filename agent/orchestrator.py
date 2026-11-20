@@ -1581,6 +1581,13 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
             try:
                 target_pt = next((r for r in result_rows if r.get("period_key") == parsed.get("detected_period")), result_rows[0])
                 target_val = target_pt.get("value")
+                if lang == "ru":
+                    lang_inst = "Ответьте на русском языке, четко, лаконично и строго по приведенным фактам."
+                elif lang == "uz_cyrl":
+                    lang_inst = "Ўзбек тилида кирилл алифбосида лўнда ва аниқ жавоб беринг."
+                else:
+                    lang_inst = "O'zbek tilida lo'nda va aniq javob bering."
+
                 prompt = (
                     f"Siz O'zbekiston Davlat statistika qo'mitasi rasmiy ma'lumotlar bazasi analitikasisiz.\n"
                     f"Qat'iy qoidalar:\n"
@@ -1597,7 +1604,7 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                     f"Hudud: {resolved_region_name}\n"
                     f"O'lchov birligi: {clean_unit}\n"
                     f"DWH natijalari: {json.dumps(result_rows[:12], ensure_ascii=False)}\n"
-                    f"{'Ответьте на русском языке, четко, лаконично и строго по приведенным фактам.' if lang == 'ru' else ('Ўзбек тилида кирилл алифбосида лўнда ва аниқ жавоб беринг.' if lang == 'uz_cyrl' else 'O\'zbek tilida lo\'nda va aniq javob bering.')}"
+                    f"{lang_inst}"
                 )
 
                 resp = await asyncio.wait_for(
