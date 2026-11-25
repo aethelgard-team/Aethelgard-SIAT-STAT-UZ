@@ -183,6 +183,90 @@ def _fit_arima(
     return None
 
 
+def downsample_forecast_timeline(
+    combined_timeline: List[Dict[str, Any]],
+    target_year: int,
+    predicted_value: Optional[float] = None,
+    lower_bound: Optional[float] = None,
+    upper_bound: Optional[float] = None,
+    model_used: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Downsample a multi-year forecast timeline into clean milestone points.
+    If len(combined_timeline) <= 24, returns the timeline as-is (with forecast metadata).
+    If len(combined_timeline) > 24, downsamples into annual milestones:
+    - 1 representative point per historical year (the latest available month/quarter of each year,
+      guaranteeing the latest actual historical DWH point like 2026-M09 is preserved)
+    - 1 forecast point per future year (2027, 2028, 2029, ..., target_year with exact predicted_value)
+    """
+    if len(combined_timeline) <= 24:
+        res = []
+        for pt in combined_timeline:
+            d = dict(pt)
+            if d.get("is_forecast") and model_used and not d.get("model_used"):
+                d["model_used"] = model_used
+            res.append(d)
+        return res
+
+    hist_pts = [p for p in combined_timeline if not p.get("is_forecast")]
+    fc_pts = [p for p in combined_timeline if p.get("is_forecast")]
+
+    # 1. Historical milestones: 1 point per year (latest available month/quarter)
+    hist_by_year = {}
+    for p in hist_pts:
+        y = p.get("year")
+        if not y:
+            m = re.match(r"^(\d{4})", str(p.get("period_key") or ""))
+            y = int(m.group(1)) if m else None
+        if y:
+            hist_by_year[y] = p
+
+    downsampled = []
+    for y in sorted(hist_by_year.keys()):
+        pt = dict(hist_by_year[y])
+        pt["is_forecast"] = False
+        pt["status"] = "valid"
+        downsampled.append(pt)
+
+    # 2. Future forecast points: 1 point per future year (years > max historical year)
+    max_hist_year = max(hist_by_year.keys()) if hist_by_year else 2026
+    fc_by_year = {}
+    for p in fc_pts:
+        y = p.get("year")
+        if not y:
+            m = re.match(r"^(\d{4})", str(p.get("period_key") or ""))
+            y = int(m.group(1)) if m else None
+        if y and y > max_hist_year:
+            if y not in fc_by_year:
+                fc_by_year[y] = []
+            fc_by_year[y].append(p)
+
+    for y in sorted(fc_by_year.keys()):
+        pts = fc_by_year[y]
+        if y == target_year and predicted_value is not None:
+            val = float(predicted_value)
+            lo = float(lower_bound) if lower_bound is not None else min(p.get("lower_bound", val) for p in pts)
+            hi = float(upper_bound) if upper_bound is not None else max(p.get("upper_bound", val) for p in pts)
+        else:
+            val = float(np.mean([p["value"] for p in pts]))
+            lo = float(np.mean([p.get("lower_bound", val) for p in pts]))
+            hi = float(np.mean([p.get("upper_bound", val) for p in pts]))
+
+        rep_pt = dict(pts[-1])
+        rep_pt["period_key"] = str(y)
+        rep_pt["year"] = y
+        rep_pt["value"] = _sanitize_float(val)
+        rep_pt["lower_bound"] = _sanitize_float(lo)
+        rep_pt["upper_bound"] = _sanitize_float(hi)
+        rep_pt["is_forecast"] = True
+        rep_pt["status"] = "forecast"
+        if model_used:
+            rep_pt["model_used"] = model_used
+        downsampled.append(rep_pt)
+
+    return downsampled
+
+
 def run_time_series_forecast(
     historical_points: List[Dict[str, Any]],
     target_year: int,
@@ -489,8 +573,20 @@ def run_time_series_forecast(
 
     history_start = valid_points[0]["period_key"]
     history_end = valid_points[-1]["period_key"]
+    last_actual_pt = valid_points[-1]
+    last_actual_val = _sanitize_float(last_actual_pt["value"])
+    last_actual_period = last_actual_pt["period_key"]
 
     combined_timeline = list(valid_points) + forecast_series
+
+    chart_timeline = downsample_forecast_timeline(
+        combined_timeline,
+        target_year=int(target_year),
+        predicted_value=prim_pred,
+        lower_bound=prim_lo,
+        upper_bound=prim_hi,
+        model_used=best_model_name
+    )
 
     return {
         "status": "success",
@@ -502,6 +598,8 @@ def run_time_series_forecast(
         "predicted_value": _sanitize_float(prim_pred),
         "lower_bound": _sanitize_float(prim_lo),
         "upper_bound": _sanitize_float(prim_hi),
+        "last_actual_value": last_actual_val,
+        "last_actual_period": last_actual_period,
         "confidence_level": 95,
         "model_used": str(best_model_name),
         "mape": _sanitize_float(best_mape),
@@ -511,5 +609,6 @@ def run_time_series_forecast(
         "history_end": history_end,
         "history_range": f"{history_start} - {history_end}",
         "forecast_series": forecast_series,
-        "combined_timeline": combined_timeline
+        "combined_timeline": combined_timeline,
+        "chart_timeline": chart_timeline
     }

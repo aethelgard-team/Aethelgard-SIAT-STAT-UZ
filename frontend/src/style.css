@@ -537,18 +537,25 @@ body.result-full .panel-left, body.result-full .panel-right { visibility: hidden
   transform-origin: bottom; animation: bar-grow .7s cubic-bezier(.16, 1, .3, 1) both;
 }
 .bar-item[data-main='true'] .bar-col { background: linear-gradient(180deg, #fbbf24, #f59e0b); box-shadow: 0 0 22px -4px rgba(245, 158, 11, .8); }
+.bar-item[data-forecast='true'] .bar-col {
+  background: linear-gradient(180deg, #f59e0b, #d97706);
+  border: 1px dashed #fbbf24;
+  box-shadow: 0 0 20px -4px rgba(245, 158, 11, .7);
+}
 .bar-item[data-missing='true'] .bar-col {
   background: repeating-linear-gradient(135deg, rgba(248, 113, 113, .25) 0 4px, transparent 4px 10px);
   border: 2px dashed #f87171; box-shadow: none;
 }
 .bar-val { font: 500 clamp(.55rem, .9vw, .78rem) var(--mono); color: var(--text-2); white-space: nowrap; }
 .bar-item[data-main='true'] .bar-val { color: #fde68a; font-weight: 700; }
+.bar-item[data-forecast='true'] .bar-val { color: #fde68a; font-weight: 700; }
 .bar-item[data-missing='true'] .bar-val { color: #fca5a5; font-weight: 700; }
 .bar-per { position: absolute; bottom: -22px; font: .62rem var(--mono); color: var(--muted); white-space: nowrap; }
 .bar-item[data-main='true'] .bar-per { color: var(--amber); }
+.bar-item[data-forecast='true'] .bar-per { color: var(--amber); }
 .bars-note { margin: 30px 0 0; font-size: .72rem; color: var(--dim); text-align: right; }
 @keyframes bar-grow { from { transform: scaleY(0); } }
-@media (max-width: 900px) { .bar-val { display: none; } .bar-item[data-main='true'] .bar-val, .bar-item[data-missing='true'] .bar-val { display: block; } }
+@media (max-width: 900px) { .bar-val { display: none; } .bar-item[data-main='true'] .bar-val, .bar-item[data-missing='true'] .bar-val, .bar-item[data-forecast='true'] .bar-val { display: block; } }
 
 /* ---------- Tavsiyalar, o'tkazib yuborish, oxirgi savollar ---------- */
 .suggest-box { margin-top: 8px; padding: 6px; border-radius: 12px; background: rgba(3, 6, 12, .85); border: 1px solid rgba(56, 189, 248, .3); }

@@ -1215,9 +1215,13 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                                 "period_label": f"{t_year}-yil",
                                 "value": s_val_num,
                                 "unit": s_clean_u,
-                                "series": fc_data.get("combined_timeline", [])[-12:],
+                                "series": fc_data.get("chart_timeline") or fc_data.get("combined_timeline", []),
                                 "is_forecast": True,
-                                "model_used": m_used
+                                "model_used": m_used,
+                                "predicted_value": s_val_num,
+                                "target_year": t_year,
+                                "last_actual_value": fc_data.get("last_actual_value"),
+                                "last_actual_period": fc_data.get("last_actual_period")
                             })
                             combined_sources.append({
                                 "n": source_idx,
@@ -1483,11 +1487,26 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
             })
             yield format_sse("stage.completed", {"stage": "verify"})
             final_ans = verification_result.get("verified_text") or final_compound_answer or deterministic_answer
+            primary_kpi = None
+            if sub_results:
+                first_sr = sub_results[0]
+                primary_kpi = {
+                    "value": first_sr.get("value"),
+                    "unit": first_sr.get("unit"),
+                    "title": first_sr.get("title"),
+                    "period_label": first_sr.get("period_label"),
+                    "is_forecast": first_sr.get("is_forecast", False),
+                    "model_used": first_sr.get("model_used"),
+                    "target_year": first_sr.get("target_year"),
+                    "last_actual_value": first_sr.get("last_actual_value"),
+                    "last_actual_period": first_sr.get("last_actual_period"),
+                }
             yield format_sse("done", {
                 "answer": final_ans,
                 "sources": combined_sources,
                 "all_passed": True,
                 "sub_results": sub_results if len(sub_results) >= 2 else None,
+                "primary_kpi": primary_kpi,
                 "total_duration_ms": round((time.time() - start_total_time) * 1000, 2)
             })
             return
@@ -1916,6 +1935,17 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                 result_rows = [extreme_pt] + [r for r in result_rows if r != extreme_pt]
                 parsed["detected_period"] = extreme_pt.get("period_key")
 
+        is_forecast_query = (tool_name == "forecast_indicator" or bool(dwh_data.get("is_forecast")))
+
+        # Smart chart slicing / downsampling:
+        # If forecast, use downsampled annual milestones (chart_timeline) so multi-year monthly timeline (e.g. 120 points)
+        # displays clear historical milestones + future milestone bars up to target_year, rather than being truncated.
+        # If historical timeline, take the most recent 24 points (result_rows[-24:]) instead of the oldest 24 ([:24]).
+        if is_forecast_query:
+            chart_data = dwh_data.get("chart_timeline") or result_rows
+        else:
+            chart_data = result_rows[-24:] if len(result_rows) > 24 else result_rows
+
         yield format_sse("tool.result", {
             "stage": "result",
             "call_id": "call_mcp_1",
@@ -1927,13 +1957,16 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
             "region_code": parsed.get("region_soato"),
             "detected_period": parsed.get("detected_period"),
             "unit": clean_unit,
-            "is_forecast": (tool_name == "forecast_indicator"),
+            "is_forecast": is_forecast_query,
             "model_used": dwh_data.get("model_used"),
             "predicted_value": dwh_data.get("predicted_value"),
+            "target_year": dwh_data.get("target_year"),
+            "last_actual_value": dwh_data.get("last_actual_value"),
+            "last_actual_period": dwh_data.get("last_actual_period"),
             "lower_bound": dwh_data.get("lower_bound"),
             "upper_bound": dwh_data.get("upper_bound"),
             "mape": dwh_data.get("mape"),
-            "data": result_rows[:24]
+            "data": chart_data
         })
         await asyncio.sleep(0.01)
 
@@ -2073,10 +2106,37 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                 "snapshot_date": str(snapshot_date)
             }]
 
+        # Hero KPI metadata in done event:
+        primary_kpi = None
+        if is_forecast_query and dwh_data.get("predicted_value") is not None:
+            t_year = dwh_data.get("target_year") or parsed.get("target_year") or (parsed.get("years")[0] if parsed.get("years") else None)
+            primary_kpi = {
+                "value": dwh_data.get("predicted_value"),
+                "unit": clean_unit,
+                "title": meta_data.get("name_uz"),
+                "period_label": f"{t_year}-yil" if t_year else "Prognoz",
+                "is_forecast": True,
+                "model_used": dwh_data.get("model_used"),
+                "target_year": t_year,
+                "last_actual_value": dwh_data.get("last_actual_value"),
+                "last_actual_period": dwh_data.get("last_actual_period"),
+            }
+        elif result_rows:
+            target_pt = next((r for r in result_rows if r.get("period_key") == parsed.get("detected_period")), result_rows[-1])
+            primary_kpi = {
+                "value": target_pt.get("value"),
+                "unit": clean_unit,
+                "title": meta_data.get("name_uz"),
+                "period_label": target_pt.get("period_label") or target_pt.get("period_key"),
+                "is_forecast": False,
+                "target_year": target_pt.get("year"),
+            }
+
         yield format_sse("done", {
             "answer": verification_result["verified_text"],
             "sources": sources,
             "all_passed": verification_result["all_passed"],
+            "primary_kpi": primary_kpi,
             "total_duration_ms": round((time.time() - start_total_time) * 1000, 2)
         })
 
