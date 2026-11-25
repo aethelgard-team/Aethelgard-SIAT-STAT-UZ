@@ -1,6 +1,5 @@
 ---
 title: Aethelgard SIAT 3D Observatory
-emoji: 🌐
 colorFrom: blue
 colorTo: indigo
 sdk: docker
