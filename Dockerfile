@@ -54,6 +54,7 @@ COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 COPY agent/ ./agent/
 COPY api/ ./api/
 COPY mcp_server/ ./mcp_server/
+COPY ml/ ./ml/
 COPY dwh/ ./dwh/
 COPY etl/ ./etl/
 COPY docs/ ./docs/

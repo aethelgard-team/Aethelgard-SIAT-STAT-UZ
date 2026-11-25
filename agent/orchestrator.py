@@ -28,7 +28,9 @@ from agent.normalizer import (
     is_greeting_query,
     strip_apostrophes,
     format_period_label,
-    format_compact_period
+    format_compact_period,
+    detect_forecast_intent,
+    is_out_of_scope_query
 )
 
 # .env yuklash
@@ -100,7 +102,9 @@ GENERIC_ATTRIBUTE_STEMS = {
     "narx", "qiymat", "hajm", "son", "miqdor", "daraja", "ulush", "foiz",
     "indeks", "sur'at", "o'sish", "osish", "tovar", "mahsulot", "xizmat",
     "respublika", "viloyat", "shahar", "tuman", "o'rtacha", "ortacha", "oylik",
-    "yillik", "choraklik", "davlat", "umumiy", "jami", "nomi", "boshiga"
+    "yillik", "choraklik", "davlat", "umumiy", "jami", "nomi", "boshiga",
+    "yetad", "yetadi", "yetishi", "bolad", "boladi", "bo'ladi", "kutil",
+    "kutilad", "kutiladi", "kutilmoqda", "prognoz", "bashorat", "kelajak", "perspektiv"
 }
 
 SYNONYM_MAP = {
@@ -377,14 +381,21 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
         or any(w in q_norm for w in ("dinamik", "o'zgardi", "ozgardi", "o'sish", "osish", "kamay", "yildan", "yilgacha", "davomida"))
     )
 
-    # Out-of-scope / kelajak yillar tekshiruvi (Trap guard)
-    is_out_of_scope = any(
+    # Out-of-scope / kelajak prognoz tekshiruvi
+    forecast_info = detect_forecast_intent(query, years)
+    is_out_of_scope = is_out_of_scope_query(query) or any(
         trap in q_norm for trap in ("bitcoin", "bitkoin", "kripto", "криптовалют", "ob-havo", "obhavo", "weather", "погода", "kurs dollar", "valyuta kursi", "dollar kursi")
     )
-    is_future_year = any(y >= 2027 for y in years)
 
-    if is_out_of_scope or is_future_year:
+    unsupported_reason = None
+    if is_out_of_scope:
         intent = "unsupported"
+        unsupported_reason = "out_of_scope"
+    elif forecast_info["is_extreme_forecast"]:
+        intent = "unsupported"
+        unsupported_reason = "extreme_forecast"
+    elif forecast_info["is_forecast"]:
+        intent = "forecast"
     elif is_meta:
         intent = "meta_query"
     elif is_region_cmp:
@@ -458,6 +469,10 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
         "is_region_explicit": is_explicit,
         "target_item_code": target_item_code,
         "intent": intent,
+        "unsupported_reason": unsupported_reason,
+        "is_forecast": forecast_info["is_forecast"],
+        "target_year": forecast_info["target_year"],
+        "has_forecast_keyword": forecast_info["has_forecast_keyword"],
         "topic_tokens": topic_tokens,
         "is_greeting": False,
         "is_generic_meat": is_generic_meat,
@@ -899,6 +914,45 @@ def _build_deterministic_answer(
             return "Кўрсатилган даврлар оралиғи учун базада тасдиқланган динамика маълумотлари топилмади."
         return "Ko'rsatilgan davrlar oralig'i uchun bazada tasdiqlangan dinamika ma'lumotlari topilmadi."
 
+    # ML Time-Series Forecasting javobini shakllantirish
+    if intent in ("forecast", "forecast_indicator") or dwh_data.get("predicted_value") is not None:
+        pred_val = dwh_data.get("predicted_value")
+        lo_bound = dwh_data.get("lower_bound")
+        hi_bound = dwh_data.get("upper_bound")
+        target_year = dwh_data.get("target_year") or parsed.get("target_year") or 2027
+        model_name = dwh_data.get("model_used") or "ML Model"
+        mape = dwh_data.get("mape", 0.0)
+        h_range = dwh_data.get("history_range") or "retrospektiv davr"
+        h_count = dwh_data.get("history_count") or len(dwh_data.get("combined_timeline", []))
+        item_n = dwh_data.get("item_name") or ind_name
+        clean_u = normalize_display_unit(raw_unit, item_n)
+
+        if pred_val is not None and lo_bound is not None and hi_bound is not None:
+            if lang == "ru":
+                return (
+                    f"Математический прогноз ML по показателю {item_n} на {target_year} год "
+                    f"(на основе модели {model_name}) составляет {pred_val:,.1f} {clean_u} "
+                    f"(95% доверительный интервал: {lo_bound:,.1f} — {hi_bound:,.1f} {clean_u}, MAPE: {mape}%). "
+                    f"Данный показатель не является официальной статистикой, а представляет собой экстраполяцию "
+                    f"{h_count} ретроспективных фактов DWH за {h_range} гг [1]."
+                )
+            elif lang == "uz_cyrl":
+                return (
+                    f"{target_year} йил учун {item_n} бўйича математик ML прогноз "
+                    f"({model_name} модели асосида) {pred_val:,.1f} {clean_u}ни ташкил этади "
+                    f"(95% ишонч оралиғи: {lo_bound:,.1f} — {hi_bound:,.1f} {clean_u}, MAPE: {mape}%). "
+                    f"Ушбу кўрсаткич расмий статистика эмас, балки {h_range} йиллардаги {h_count} та "
+                    f"ретроспектив DWH фактларига асосланган математик экстраполяциядир [1]."
+                )
+            else:
+                return (
+                    f"{target_year}-yil uchun {item_n} bo'yicha matematik ML prognoz "
+                    f"({model_name} modeli asosida) {pred_val:,.1f} {clean_u}ni tashkil etadi "
+                    f"(95% ishonch oralig'i: {lo_bound:,.1f} — {hi_bound:,.1f} {clean_u}, MAPE: {mape}%). "
+                    f"Ushbu ko'rsatkich rasmiy statistika emas, balki {h_range} yillardagi {h_count} ta "
+                    f"retrospektiv DWH faktlariga asoslangan matematik ekstrapolyatsiyadir [1]."
+                )
+
     # Default: get_data
     facts = [f for f in (dwh_data.get("data") or []) if f.get("value") is not None]
     if facts:
@@ -1125,8 +1179,65 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
 
             for sq in parsed["sub_queries"]:
                 sq_parsed = analyze_question_full(sq)
+
+                if sq_parsed.get("intent") == "forecast" or sq_parsed.get("is_forecast"):
+                    s_res = tools.search_indicators(sq_parsed["core_search"], limit=6)
+                    cands = s_res.get("results", [])
+                    total_search_matches += s_res.get("count", 0)
+                    all_search_results.extend(cands)
+
+                    s_ind, s_item, s_reg, s_val = _select_best_candidate_and_item(cands, sq_parsed)
+                    if s_ind:
+                        t_year = sq_parsed.get("target_year") or 2027
+                        fc_data = tools.forecast_indicator(s_ind, t_year, s_item)
+                        if fc_data.get("status") == "success":
+                            s_meta = tools.get_indicator_metadata(s_ind)
+                            s_val_num = fc_data["predicted_value"]
+                            combined_dwh_facts.append(fc_data)
+                            total_dwh_rows += len(fc_data.get("combined_timeline", []))
+                            s_title = fc_data.get("item_name") or s_meta.get("name_uz") or "Ko'rsatkich"
+                            s_clean_u = normalize_display_unit(fc_data.get("unit") or s_meta.get("unit_uz"), s_title)
+                            m_used = fc_data.get("model_used")
+                            m_mape = fc_data.get("mape")
+                            if lang == "ru":
+                                bullet = f"{source_idx}. Математический прогноз ML по показателю {s_title} на {t_year} год ({m_used}) составляет {s_val_num:,.1f} {s_clean_u} (MAPE: {m_mape}%) [{source_idx}]."
+                            elif lang == "uz_cyrl":
+                                bullet = f"{source_idx}. {t_year} йил учун {s_title} бўйича математик ML прогноз ({m_used}) {s_val_num:,.1f} {s_clean_u}ни ташкил этади (MAPE: {m_mape}%) [{source_idx}]."
+                            else:
+                                bullet = f"{source_idx}. {t_year}-yil uchun {s_title} bo'yicha matematik ML prognoz ({m_used}) {s_val_num:,.1f} {s_clean_u}ni tashkil etadi (MAPE: {m_mape}%) [{source_idx}]."
+                            sub_bullets.append(bullet)
+                            sub_results.append({
+                                "index": source_idx,
+                                "indicator_id": s_ind,
+                                "title": s_title,
+                                "region": s_reg,
+                                "period_raw": str(t_year),
+                                "period_label": f"{t_year}-yil",
+                                "value": s_val_num,
+                                "unit": s_clean_u,
+                                "series": fc_data.get("combined_timeline", [])[-12:],
+                                "is_forecast": True,
+                                "model_used": m_used
+                            })
+                            combined_sources.append({
+                                "n": source_idx,
+                                "indicator_id": s_ind,
+                                "name": s_meta.get("name_uz"),
+                                "url": fc_data.get("source_url") or s_meta.get("source_url") or "https://siat.stat.uz",
+                                "snapshot_date": "2026-11-11"
+                            })
+                            source_idx += 1
+                            continue
+
                 if sq_parsed.get("is_unsupported") or sq_parsed.get("intent") == "unsupported":
-                    if any(y >= 2027 for y in sq_parsed.get("years", [])):
+                    if sq_parsed.get("unsupported_reason") == "extreme_forecast" or any(y > 2036 for y in sq_parsed.get("years", [])):
+                        if lang == "ru":
+                            bullet = f"{source_idx}. По запросу «{sq}»: горизонт прогнозирования ограничен 2036 годом."
+                        elif lang == "uz_cyrl":
+                            bullet = f"{source_idx}. «{sq}» бўйича: прогнозлаш горизонти 2036 йил билан чекланган."
+                        else:
+                            bullet = f"{source_idx}. «{sq}» bo'yicha: prognozlash gorizonti 2036-yil bilan cheklangan."
+                    elif any(y >= 2027 for y in sq_parsed.get("years", [])):
                         future_yrs = ", ".join(str(y) for y in sq_parsed["years"])
                         if lang == "ru":
                             bullet = f"{source_idx}. По запросу «{sq}»: официальные статистические данные на будущие годы ({future_yrs}) отсутствуют в ретроспективной базе DWH."
@@ -1383,13 +1494,14 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
 
         # 3. Mavzudan tashqari / Kelajak prognozlari (Refusal Guard)
         if parsed.get("is_unsupported") or parsed.get("intent") == "unsupported":
-            if any(y >= 2027 for y in parsed.get("years", [])):
+            unsupported_reason = parsed.get("unsupported_reason")
+            if unsupported_reason == "extreme_forecast" or any(y > 2036 for y in parsed.get("years", [])):
                 if lang == "ru":
-                    refusal_msg = "Извините, система Aethelgard · SIAT работает исключительно на основе официальных ретроспективных данных Агентства статистики (по сентябрь 2026 года включительно). Будущие прогнозы и экстраполяции на 2027 год и последующие периоды отсутствуют в официальной статистической базе DWH."
+                    refusal_msg = "Модуль прогнозирования Aethelgard · SIAT ограничен 10-летним горизонтом (до 2036 года). Экстраполяции за пределами 2036 года статистически ненадежны."
                 elif lang == "uz_cyrl":
-                    refusal_msg = "Кечирасиз, Aethelgard · SIAT тизими фақат Ўзбекистон Давлат статистика агентлигининг расмий ретроспектив маълумотлари (2026 йил сентябргача бўлган давр) асосида ишлайди. 2027 йил ва ундан кейинги келажак прогнозлари расмий статистик DWH базасида мавжуд эмас."
+                    refusal_msg = "Aethelgard · SIAT прогнозлаш модули максимал 10 йиллик горизонт (2036 йилгача) билан чекланган. 2036 йилдан кейинги узоқ муддатли экстраполяциялар математик ва статистик жиҳатдан ишончсиз ҳисобланади."
                 else:
-                    refusal_msg = "Kechirasiz, Aethelgard · SIAT tizimi faqat O'zbekiston Davlat statistika agentligining rasmiy retrospektiv ma'lumotlari (2026-yil sentyabrgacha bo'lgan davr) asosida ishlaydi. 2027-yil va undan keyingi kelajak prognozlari rasmiy statistik DWH bazasida mavjud emas."
+                    refusal_msg = "Aethelgard · SIAT prognozlash moduli maksimal 10 yillik gorizont (2036-yilgacha) bilan cheklangan. 2036-yildan keyingi uzoq muddatli ekstrapolyatsiyalar matematik va statistik jihatdan ishonchsiz hisoblanadi."
             else:
                 if lang == "ru":
                     refusal_msg = "К сожалению, по данной теме в базе DWH официальный статистический показатель не найден."
@@ -1621,7 +1733,16 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                 resolved_periods = prefix_hits if prefix_hits else parsed["periods"]
 
         target_period_single = None
-        if intent == "compare_regions" and (resolved_periods or avail_periods):
+        if intent == "forecast":
+            tool_name = "forecast_indicator"
+            target_year = parsed.get("target_year") or 2027
+            tool_args = {
+                "indicator_id": selected_indicator_id,
+                "target_year": target_year,
+                "item_code": resolved_item_code
+            }
+            target_period_single = str(target_year)
+        elif intent == "compare_regions" and (resolved_periods or avail_periods):
             tool_name = "compare_regions"
             cmp_period = resolved_periods[0] if resolved_periods else avail_periods[-1]
             tool_args = {"indicator_id": selected_indicator_id, "period": cmp_period}
@@ -1696,7 +1817,14 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
         })
 
         dwh_t0 = time.time()
-        if tool_name == "compare_regions":
+        if tool_name == "forecast_indicator":
+            dwh_data = tools.forecast_indicator(
+                indicator_id=tool_args["indicator_id"],
+                target_year=tool_args["target_year"],
+                item_code=tool_args.get("item_code")
+            )
+            rows_count = len(dwh_data.get("combined_timeline", []))
+        elif tool_name == "compare_regions":
             dwh_data = tools.compare_regions(
                 indicator_id=tool_args["indicator_id"],
                 period=tool_args["period"]
@@ -1753,7 +1881,13 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
         # =====================================================================
         # 5-BOSQICH: Natijani taqdim etish (result)
         # =====================================================================
-        result_rows = dwh_data.get("data") or dwh_data.get("timeline") or dwh_data.get("ranking") or []
+        result_rows = (
+            dwh_data.get("combined_timeline")
+            or dwh_data.get("data")
+            or dwh_data.get("timeline")
+            or dwh_data.get("ranking")
+            or []
+        )
 
         # Optimization 2: Measurement Unit Cleanup
         resolved_item_name = None
@@ -1793,6 +1927,12 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
             "region_code": parsed.get("region_soato"),
             "detected_period": parsed.get("detected_period"),
             "unit": clean_unit,
+            "is_forecast": (tool_name == "forecast_indicator"),
+            "model_used": dwh_data.get("model_used"),
+            "predicted_value": dwh_data.get("predicted_value"),
+            "lower_bound": dwh_data.get("lower_bound"),
+            "upper_bound": dwh_data.get("upper_bound"),
+            "mape": dwh_data.get("mape"),
             "data": result_rows[:24]
         })
         await asyncio.sleep(0.01)
@@ -1820,26 +1960,43 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
                 else:
                     lang_inst = "O'zbek tilida lo'nda va aniq javob bering."
 
-                target_p_human = _format_p(target_pt.get("period_key"), lang)
-                prompt = (
-                    f"Siz O'zbekiston Davlat statistika qo'mitasi rasmiy ma'lumotlar bazasi analitikasisiz.\n"
-                    f"Qat'iy qoidalar:\n"
-                    f"1. Har bir raqam faqat berilgan DWH natijalaridan aynan olinishi shart!\n"
-                    f"2. Yangi raqam hisoblamang va taxminiy raqam kiritmang!\n"
-                    f"3. Check the requested measurement unit. If the user asks for price/cost ('narx', 'qancha'), you MUST filter the RRF results and ONLY select indicators where the unit is currency ('so'm'). Never output volume metrics (e.g., 'mln. dona') for price queries.\n"
-                    f"4. When asked for maximum, minimum, or 'which month/period' (e.g., 'eng yuqori', 'eng kam'), you must request the full time-series array, evaluate all periods, and select the correct one. The final numerical output provided to the UI MUST perfectly match the text explanation.\n"
-                    f"5. Hudud aniqligi: Natijani doimo aniqlangan hudud ({resolved_region_name}) bilan bog'lang (Respublika o'rtachasimi yoki aniq shahar/viloyatmi).\n"
-                    f"6. O'lchov birligi: O'lchov birligi sifatida aynan '{clean_unit}' dan foydalaning. Ziddiyatli birliklarni (masalan tuxum uchun '1 kg so'mda') mutlaqo ishlatmang.\n"
-                    f"7. Agar foydalanuvchi bitta aniq davrni ({parsed.get('detected_period')}) so'ragan bo'lsa, asosiy javobda aynan shu davr qiymatini ({target_val:,.1f} {clean_unit}) ko'rsating. Qolgan davrlar grafik uchun 12 davrli kontekst sifatida berilgan.\n"
-                    f"8. Davrni foydalanuvchiga hech qachon '2026-M09' kabi xom kodda ko'rsatmang! Inson tushunadigan shaklda ('{target_p_human}') ko'rsating.\n"
-                    f"9. Tasdiqlangan ma'lumotdan keyin [1] manba havolasi qo'ying.\n\n"
-                    f"Savol: '{question}'\n"
-                    f"Ko'rsatkich: {meta_data.get('name_uz')}\n"
-                    f"Hudud: {resolved_region_name}\n"
-                    f"O'lchov birligi: {clean_unit}\n"
-                    f"DWH natijalari: {json.dumps(result_rows[:12], ensure_ascii=False)}\n"
-                    f"{lang_inst}"
-                )
+                if tool_name == "forecast_indicator" or intent == "forecast":
+                    prompt = (
+                        f"Siz O'zbekiston Davlat statistika qo'mitasi rasmiy ma'lumotlar bazasi analitikasisiz.\n"
+                        f"Qat'iy qoidalar:\n"
+                        f"1. Ushbu so'rov kelajak davri prognozi bo'lib, javobda bu RASMIY STATISTIKA EMAS, balki {dwh_data.get('model_used')} modeli asosidagi MATEMATIK ML PROGNOZ ekanligi alohida ta'kidlansin!\n"
+                        f"2. Prognoz qilinayotgan {dwh_data.get('target_year')}-yil uchun bashorat qiymatini ({dwh_data.get('predicted_value'):,.1f} {clean_unit}), 95% ishonch oralig'ini ({dwh_data.get('lower_bound'):,.1f} — {dwh_data.get('upper_bound'):,.1f} {clean_unit}), model nomini ({dwh_data.get('model_used')}) va aniqligini (MAPE: {dwh_data.get('mape')}%) aniq keltiring.\n"
+                        f"3. DWH bazasidagi {dwh_data.get('history_range')} yillardagi {dwh_data.get('history_count')} ta retrospektiv faktlar asos qilib olinganini ko'rsating.\n"
+                        f"4. Yangi yoki bazada bo'lmagan boshqa raqamlarni mutlaqo to'qimang!\n"
+                        f"5. Tasdiqlangan ma'lumotdan keyin [1] manba havolasi qo'ying.\n\n"
+                        f"Savol: '{question}'\n"
+                        f"Ko'rsatkich: {meta_data.get('name_uz')}\n"
+                        f"Hudud: {resolved_region_name}\n"
+                        f"O'lchov birligi: {clean_unit}\n"
+                        f"ML Prognoz ma'lumotlari: {json.dumps(dwh_data, ensure_ascii=False)}\n"
+                        f"{lang_inst}"
+                    )
+                else:
+                    target_p_human = _format_p(target_pt.get("period_key"), lang)
+                    prompt = (
+                        f"Siz O'zbekiston Davlat statistika qo'mitasi rasmiy ma'lumotlar bazasi analitikasisiz.\n"
+                        f"Qat'iy qoidalar:\n"
+                        f"1. Har bir raqam faqat berilgan DWH natijalaridan aynan olinishi shart!\n"
+                        f"2. Yangi raqam hisoblamang va taxminiy raqam kiritmang!\n"
+                        f"3. Check the requested measurement unit. If the user asks for price/cost ('narx', 'qancha'), you MUST filter the RRF results and ONLY select indicators where the unit is currency ('so'm'). Never output volume metrics (e.g., 'mln. dona') for price queries.\n"
+                        f"4. When asked for maximum, minimum, or 'which month/period' (e.g., 'eng yuqori', 'eng kam'), you must request the full time-series array, evaluate all periods, and select the correct one. The final numerical output provided to the UI MUST perfectly match the text explanation.\n"
+                        f"5. Hudud aniqligi: Natijani doimo aniqlangan hudud ({resolved_region_name}) bilan bog'lang (Respublika o'rtachasimi yoki aniq shahar/viloyatmi).\n"
+                        f"6. O'lchov birligi: O'lchov birligi sifatida aynan '{clean_unit}' dan foydalaning. Ziddiyatli birliklarni (masalan tuxum uchun '1 kg so'mda') mutlaqo ishlatmang.\n"
+                        f"7. Agar foydalanuvchi bitta aniq davrni ({parsed.get('detected_period')}) so'ragan bo'lsa, asosiy javobda aynan shu davr qiymatini ({target_val:,.1f} {clean_unit}) ko'rsating. Qolgan davrlar grafik uchun 12 davrli kontekst sifatida berilgan.\n"
+                        f"8. Davrni foydalanuvchiga hech qachon '2026-M09' kabi xom kodda ko'rsatmang! Inson tushunadigan shaklda ('{target_p_human}') ko'rsating.\n"
+                        f"9. Tasdiqlangan ma'lumotdan keyin [1] manba havolasi qo'ying.\n\n"
+                        f"Savol: '{question}'\n"
+                        f"Ko'rsatkich: {meta_data.get('name_uz')}\n"
+                        f"Hudud: {resolved_region_name}\n"
+                        f"O'lchov birligi: {clean_unit}\n"
+                        f"DWH natijalari: {json.dumps(result_rows[:12], ensure_ascii=False)}\n"
+                        f"{lang_inst}"
+                    )
 
                 resp = await asyncio.wait_for(
                     asyncio.to_thread(

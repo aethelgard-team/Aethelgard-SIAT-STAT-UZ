@@ -581,3 +581,137 @@ def compare_items(
         "total_items": len(facts),
         "ranking": facts
     }
+
+
+def forecast_indicator(
+    indicator_id: int,
+    target_year: int,
+    item_code: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Muayyan ko'rsatkichning tarixiy vaqt qatori asosida kelgusi davrlar (2027-2036)
+    uchun matematik ML prognozini hisoblaydi (Ridge, Holt-Winters ETS, ARIMA).
+
+    Args:
+        indicator_id: Ko'rsatkich ID si (masalan: 1308, 273).
+        target_year: Prognoz qilinayotgan kelajak yili (masalan: 2028, 2030).
+        item_code: Muayyan tovar yoki hudud kodi (agar ko'rsatilmasa, asosiy umumrespublika yoki eng to'liq qator olinadi).
+
+    Returns:
+        Prognoz qiymati, 95% ishonch oralig'i, tanlangan ML model va to'liq vaqt qatori.
+    """
+    with get_db_cursor() as cur:
+        # Indicator metadata tekshirish
+        cur.execute("""
+            SELECT name_uz, unit_uz, source_url
+            FROM dwh.dim_indicator
+            WHERE indicator_id = %s;
+        """, (indicator_id,))
+        ind_row = cur.fetchone()
+        if not ind_row:
+            return {"error": f"Ko'rsatkich #{indicator_id} topilmadi."}
+
+        ind_name = ind_row["name_uz"]
+        ind_unit = ind_row["unit_uz"]
+        source_url = ind_row.get("source_url") or ""
+
+        # Agar item_code berilmagan bo'lsa, eng mos itemni aniqlash
+        if not item_code:
+            # 1. Umumrespublika yoki asosiy jami qatorini qidirish
+            cur.execute("""
+                SELECT item_code, name_uz
+                FROM dwh.dim_item
+                WHERE indicator_id = %s
+                  AND (
+                      item_code = '1700'
+                      OR name_uz ILIKE '%%respublikasi%%'
+                      OR name_uz ILIKE '%%jami%%'
+                      OR name_uz ILIKE '%%hammasi%%'
+                  )
+                LIMIT 1;
+            """, (indicator_id,))
+            best_item = cur.fetchone()
+
+            if not best_item:
+                # 2. Eng ko'p faktga ega bo'lgan itemni tanlash
+                cur.execute("""
+                    SELECT it.item_code, it.name_uz, count(*) as cnt
+                    FROM dwh.fact_value f
+                    JOIN dwh.dim_item it ON f.item_id = it.item_id
+                    WHERE f.indicator_id = %s AND f.status = 'valid'
+                    GROUP BY it.item_code, it.name_uz
+                    ORDER BY cnt DESC, it.item_code ASC
+                    LIMIT 1;
+                """, (indicator_id,))
+                best_item = cur.fetchone()
+
+            if best_item:
+                item_code = best_item["item_code"]
+                item_name = best_item["name_uz"]
+            else:
+                return {"error": f"Ko'rsatkich #{indicator_id} uchun mos klassifikator topilmadi."}
+        else:
+            cur.execute("""
+                SELECT name_uz FROM dwh.dim_item
+                WHERE indicator_id = %s AND item_code = %s
+                LIMIT 1;
+            """, (indicator_id, str(item_code).strip()))
+            i_row = cur.fetchone()
+            item_name = i_row["name_uz"] if i_row else ""
+
+        # Tarixiy ma'lumotlarni olish
+        cur.execute("""
+            SELECT 
+                f.period_key,
+                p.year,
+                p.month,
+                p.quarter,
+                p.period_type,
+                f.value,
+                f.raw_value,
+                f.status
+            FROM dwh.fact_value f
+            LEFT JOIN dwh.dim_period p ON f.period_key = p.period_key
+            JOIN dwh.dim_item it ON f.item_id = it.item_id
+            WHERE f.indicator_id = %s AND it.item_code = %s AND f.status = 'valid'
+            ORDER BY 
+                p.year ASC NULLS LAST, 
+                COALESCE(p.month, p.quarter, 0) ASC, 
+                f.period_key ASC;
+        """, (indicator_id, str(item_code).strip()))
+        rows = cur.fetchall()
+
+    if not rows:
+        return {
+            "error": f"Ko'rsatkich #{indicator_id} va item_code='{item_code}' bo'yicha ma'lumot topilmadi.",
+            "indicator_id": indicator_id,
+            "item_code": item_code
+        }
+
+    from ml.forecaster import run_time_series_forecast
+
+    historical_points = []
+    for r in rows:
+        if r["value"] is not None:
+            historical_points.append({
+                "period_key": r["period_key"],
+                "year": r["year"],
+                "month": r.get("month"),
+                "quarter": r.get("quarter"),
+                "value": float(r["value"]),
+                "status": r["status"]
+            })
+
+    forecast_res = run_time_series_forecast(
+        historical_points=historical_points,
+        target_year=target_year,
+        indicator_name=ind_name,
+        item_code=str(item_code).strip(),
+        item_name=item_name,
+        unit=ind_unit or ""
+    )
+
+    forecast_res["indicator_id"] = indicator_id
+    forecast_res["source_url"] = source_url
+    return forecast_res
+

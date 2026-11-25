@@ -705,7 +705,7 @@ def run_pipeline(limit: Optional[int] = None, specific_id: Optional[int] = None,
     # 9. ROADMAP TEKSHIRUVI: Mol go'shti, 2026-M09 (sdmx_data_1308.json)
     # -------------------------------------------------------------------------
     print("\n" + "=" * 70)
-    print("🔍 ROADMAP SINOVI: 'Mol go'shti, 2026-M09' tekshiruvi boshlandi...")
+    print("ROADMAP SINOVI: 'Mol go'shti, 2026-M09' tekshiruvi boshlandi...")
     print("=" * 70)
     try:
         cur = conn.cursor()
@@ -739,7 +739,7 @@ def run_pipeline(limit: Optional[int] = None, specific_id: Optional[int] = None,
 
             expected_val = 127857.3
             if abs(float(val) - expected_val) < 0.01:
-                print(f"\n🎯 [MUVAFFAQIYATLI] Bazadagi qiymat ({val}) kutilgan qiymatga ({expected_val}) 100% TENG!")
+                print(f"\n[MUVAFFAQIYATLI] Bazadagi qiymat ({val}) kutilgan qiymatga ({expected_val}) 100% TENG!")
             else:
                 print(f"\n[!] Ogohlantirish: Qiymat kutilgandan farq qildi: {val} != {expected_val}")
         else:

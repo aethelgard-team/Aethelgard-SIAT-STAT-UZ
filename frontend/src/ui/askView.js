@@ -160,9 +160,11 @@ export function initAskView({ scene, inspector, demo = null }) {
     const finalRegion = regionName || main.region_name || parsed.detected_region || '';
     const labelTitle = main.item_name || indicatorName || '';
     const pLabel = customPeriod || (periodOf(main) ? formatPeriodLabel(periodOf(main)) : '');
-    const finalLabel = finalRegion && !labelTitle.includes(finalRegion)
+    const isForecast = Boolean(main.is_forecast || main.status === 'forecast');
+    const badge = isForecast ? ` [ML PROGNOZ · ${main.model_used || 'ETS/ARIMA'}]` : '';
+    const finalLabel = (finalRegion && !labelTitle.includes(finalRegion)
       ? joinParts(labelTitle, finalRegion, pLabel)
-      : joinParts(labelTitle, pLabel);
+      : joinParts(labelTitle, pLabel)) + badge;
 
     $('#r-label').textContent = finalLabel;
     $('#r-value').textContent = formatNumber(Number(main.value));
@@ -442,6 +444,13 @@ export function initAskView({ scene, inspector, demo = null }) {
       case 'tool.result': {
         stage('result', 'done');
         const rows = d.data ?? [];
+        if (d.is_forecast) {
+          rows.forEach((r) => {
+            if (r.is_forecast) {
+              r.model_used = d.model_used;
+            }
+          });
+        }
         setStageDetail(stagesEl, 'result', `${rows.length} qator · ${d.execution_ms} ms`);
         const targetPeriod = d.detected_period || parsed.detected_period || '';
         const regionName = d.region_name || parsed.detected_region || '';

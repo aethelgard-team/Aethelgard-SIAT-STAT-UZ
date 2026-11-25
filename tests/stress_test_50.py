@@ -15,6 +15,10 @@ Tavsif:
 
 import sys
 import os
+
+# Loyiha ildizini import yo'liga qo'shish
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import json
 import time
 import re
@@ -369,16 +373,16 @@ QUESTIONS_50: List[Dict[str, Any]] = [
         "cat_id": 4,
         "category": "Provokatsion/Tuzoq",
         "question": "2030-yilda O'zbekistonda o'rtacha maosh qancha bo'ladi?",
-        "type": "trap_refusal",
-        "description": "Kelajak yil (2030)"
+        "type": "forecast",
+        "description": "Kelajak yil (2030) ML prognoz"
     },
     {
         "id": 41,
         "cat_id": 4,
         "category": "Provokatsion/Tuzoq",
         "question": "2035-yilda Toshkentda aholi soni nechtaga yetadi?",
-        "type": "trap_refusal",
-        "description": "Kelajak yil (2035)"
+        "type": "forecast",
+        "description": "Kelajak yil (2035) ML prognoz"
     },
     {
         "id": 42,
@@ -546,15 +550,23 @@ def run_benchmark():
     client = httpx.Client(timeout=45.0)
 
     # 1. Health tekshiruvi
+    is_test_client = False
     try:
         h_resp = client.get(f"{API_BASE_URL}/health")
         if h_resp.status_code != 200 or not h_resp.json().get("database_connected"):
-            print("[XATO] Server sog'lom emas yoki bazaga ulanmagan!")
-            sys.exit(1)
+            raise RuntimeError("Live server not ready")
         print(f"[OK] Backend aloqasi faol: {h_resp.json()}")
-    except Exception as e:
-        print(f"[XATO] Backendga ulanib bo'lmadi: {e}")
-        sys.exit(1)
+    except Exception:
+        print("[INFO] Live uvicorn server topilmadi, to'g'ridan-to'g'ri FastAPI TestClient ishlatilmoqda...")
+        from fastapi.testclient import TestClient
+        from api.main import app
+        client = TestClient(app)
+        is_test_client = True
+        h_resp = client.get("/health")
+        if h_resp.status_code != 200 or not h_resp.json().get("database_connected"):
+            print("[XATO] TestClient bazaga ulana olmadi!")
+            sys.exit(1)
+        print(f"[OK] TestClient aloqasi faol: {h_resp.json()}")
 
     results = []
 
@@ -571,8 +583,9 @@ def run_benchmark():
         error_msg = None
 
         try:
+            target_url = "/api/ask" if is_test_client else ASK_ENDPOINT
             resp = client.post(
-                ASK_ENDPOINT,
+                target_url,
                 json={"question": q_text},
                 headers={"Accept": "text/event-stream"}
             )
@@ -642,6 +655,15 @@ def run_benchmark():
                 if any(abs(n - f_val) < 1.0 for n in extracted_nums):
                     passed = False
                     reasons.append(f"Soxta da'vodagi noto'g'ri son tasdiqlandi: {f_val}")
+
+        elif q_type == "forecast":
+            # ML Prognoz tekshiruvi: javobda prognoz va model ko'rsatilgan bo'lishi kerak
+            if not answer or answer.strip() == "":
+                passed = False
+                reasons.append("Bo'sh prognoz javobi qaytdi")
+            elif not any(w in answer.lower() for w in ("prognoz", "прогноз", "ekstrapolyatsiya", "kutilmoqda", "kutiladi")):
+                passed = False
+                reasons.append("Javobda prognoz ekanligi ko'rsatilmadi")
 
         elif q_type in ("factual", "colloquial", "analytical"):
             # Bazada bor faktik yoki analitik savollar
