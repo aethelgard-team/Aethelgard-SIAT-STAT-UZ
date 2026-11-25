@@ -1,40 +1,40 @@
 {
-  "generated_at": "2026-11-20 18:19:41",
+  "generated_at": "2026-11-25 17:08:35",
   "total_questions": 50,
   "passed": 50,
   "pass_rate_pct": 100.0,
-  "avg_latency_sec": 1.41926,
-  "max_latency_sec": 3.012,
+  "avg_latency_sec": 1.4936,
+  "max_latency_sec": 5.025,
   "categories": {
     "Faktik": {
       "total": 15,
       "passed": 15,
       "pct": 100.0,
-      "avg_lat": 1.5685333333333333
+      "avg_lat": 1.5244666666666666
     },
     "Jonli/Sinonim": {
       "total": 10,
       "passed": 10,
       "pct": 100.0,
-      "avg_lat": 1.3045
+      "avg_lat": 1.4738
     },
     "Analitik/Taqqoslash": {
       "total": 10,
       "passed": 10,
       "pct": 100.0,
-      "avg_lat": 1.559
+      "avg_lat": 1.5598
     },
     "Provokatsion/Tuzoq": {
       "total": 10,
       "passed": 10,
       "pct": 100.0,
-      "avg_lat": 0.9352
+      "avg_lat": 1.6125
     },
     "Domen tashqari/Meta": {
       "total": 5,
       "passed": 5,
       "pct": 100.0,
-      "avg_lat": 1.8896000000000002
+      "avg_lat": 1.0704
     }
   },
   "details": [
@@ -44,13 +44,13 @@
       "question": "2026-yil sentyabrda mol go'shtining o'rtacha narxi qancha edi?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 3.012,
+      "latency_sec": 2.611,
       "passed": true,
       "reason": "OK",
       "selected_id": 1308,
       "unit": "so'm (1 kg)",
       "row_count": 12,
-      "answer": "2026-M09 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Mol go'shtining o'rtacha qiymati 127,857.3 so'm (1 kg)ni tashkil etgan [1]."
+      "answer": "2026-yil sentyabr oyi holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Mol go'shtining o'rtacha qiymati 127,857.3 so'm (1 kg)ni tashkil etgan [1]."
     },
     {
       "id": 2,
@@ -58,13 +58,13 @@
       "question": "2026-yil sentyabr oyida 10 dona tuxum narxi qancha bo'lgan?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.546,
+      "latency_sec": 0.853,
       "passed": true,
       "reason": "OK",
       "selected_id": 1308,
       "unit": "so'm (10 dona)",
       "row_count": 12,
-      "answer": "2026-M09 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Tuxum (10 dona)ning o'rtacha qiymati 13,452.6 so'm (10 dona)ni tashkil etgan [1]."
+      "answer": "2026-yil sentyabr oyi holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Tuxum (10 dona)ning o'rtacha qiymati 13,452.6 so'm (10 dona)ni tashkil etgan [1]."
     },
     {
       "id": 3,
@@ -72,13 +72,13 @@
       "question": "2026-yil sentyabrda shakar narxi qancha edi?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.227,
+      "latency_sec": 1.085,
       "passed": true,
       "reason": "OK",
       "selected_id": 1308,
       "unit": "so'm (1 kg)",
       "row_count": 12,
-      "answer": "2026-M09 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Shakarning o'rtacha qiymati 12,963.0 so'm (1 kg)ni tashkil etgan [1]."
+      "answer": "2026-yil sentyabr oyi holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Shakarning o'rtacha qiymati 12,963.0 so'm (1 kg)ni tashkil etgan [1]."
     },
     {
       "id": 4,
@@ -86,13 +86,13 @@
       "question": "2026-yil sentyabr oyida 1-navli bug'doy uni narxi qancha bo'lgan?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.424,
+      "latency_sec": 1.372,
       "passed": true,
       "reason": "OK",
       "selected_id": 1308,
       "unit": "so'm (1 kg)",
       "row_count": 12,
-      "answer": "2026-M09 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha 1-navli bug'doy unining o'rtacha qiymati 6,607.3 so'm (1 kg)ni tashkil etgan [1]."
+      "answer": "2026-yil sentyabr oyi holatiga ko'ra, O'zbekiston Respublikasi bo'yicha 1-navli bug'doy unining o'rtacha qiymati 6,607.3 so'm (1 kg)ni tashkil etgan [1]."
     },
     {
       "id": 5,
@@ -100,13 +100,13 @@
       "question": "2026-yil sentyabrda kartoshkaning o'rtacha narxi qancha edi?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.294,
+      "latency_sec": 1.058,
       "passed": true,
       "reason": "OK",
       "selected_id": 1308,
       "unit": "so'm (1 kg)",
       "row_count": 12,
-      "answer": "2026-M09 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Kartoshkaning o'rtacha qiymati 4,991.4 so'm (1 kg)ni tashkil etgan [1]."
+      "answer": "2026-yil sentyabr oyi holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Kartoshkaning o'rtacha qiymati 4,991.4 so'm (1 kg)ni tashkil etgan [1]."
     },
     {
       "id": 6,
@@ -114,13 +114,13 @@
       "question": "2026-yilda O'zbekistonning doimiy aholisi soni qancha?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.399,
+      "latency_sec": 1.484,
       "passed": true,
       "reason": "OK",
       "selected_id": 2441,
       "unit": "Ming kishi",
       "row_count": 12,
-      "answer": "2026 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha O‘zbekiston Respublikasining o'rtacha qiymati 38,236.7 Ming kishini tashkil etgan [1]."
+      "answer": "2026-yil holatiga ko'ra, O'zbekiston Respublikasi bo'yicha O‘zbekiston Respublikasining o'rtacha qiymati 38,236.7 Ming kishini tashkil etgan [1]."
     },
     {
       "id": 7,
@@ -128,7 +128,7 @@
       "question": "2026-yilda Toshkent shahrining doimiy aholisi soni qancha bo'lgan?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.211,
+      "latency_sec": 1.765,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -142,13 +142,13 @@
       "question": "2026-yilda Samarqand viloyatining doimiy aholisi soni qancha?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.404,
+      "latency_sec": 1.48,
       "passed": true,
       "reason": "OK",
       "selected_id": 246,
       "unit": "ming kishi",
       "row_count": 12,
-      "answer": "2026 holatiga ko'ra, Samarqand viloyati bo'yicha Samarqand viloyatining o'rtacha qiymati 4,379.8 ming kishini tashkil etgan [1]."
+      "answer": "2026-yil holatiga ko'ra, Samarqand viloyati bo'yicha Samarqand viloyatining o'rtacha qiymati 4,379.8 ming kishini tashkil etgan [1]."
     },
     {
       "id": 9,
@@ -156,13 +156,13 @@
       "question": "2025-yilda o'rtacha hisoblangan oylik ish haqi qancha bo'lgan?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.713,
+      "latency_sec": 1.674,
       "passed": true,
       "reason": "OK",
       "selected_id": 500,
       "unit": "so'm",
       "row_count": 9,
-      "answer": "2025 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha O‘zbekiston Respublikasining o'rtacha qiymati 5,179,326.0 so'mni tashkil etgan [1]."
+      "answer": "2025-yil holatiga ko'ra, O'zbekiston Respublikasi bo'yicha O‘zbekiston Respublikasining o'rtacha qiymati 5,179,326.0 so'mni tashkil etgan [1]."
     },
     {
       "id": 10,
@@ -170,13 +170,13 @@
       "question": "2026-yil 3-chorakda o'rtacha hisoblangan oylik ish haqi qancha bo'ldi?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.891,
+      "latency_sec": 1.995,
       "passed": true,
       "reason": "OK",
       "selected_id": 522,
       "unit": "so'm",
       "row_count": 12,
-      "answer": "2026-Q3 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha O‘zbekiston Respublikasining o'rtacha qiymati 7,274,102.0 so'mni tashkil etgan [1]."
+      "answer": "2026-yil 3-chorak holatiga ko'ra, O'zbekiston Respublikasi bo'yicha O‘zbekiston Respublikasining o'rtacha qiymati 7,274,102.0 so'mni tashkil etgan [1]."
     },
     {
       "id": 11,
@@ -184,13 +184,13 @@
       "question": "2025-yilda O'zbekiston yalpi ichki mahsuloti hajmi qancha bo'lgan?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.523,
+      "latency_sec": 1.583,
       "passed": true,
       "reason": "OK",
       "selected_id": 1920,
       "unit": "joriy narxlarda, mlrd.so'm",
       "row_count": 12,
-      "answer": "2025 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha O‘zbekiston Respublikasining o'rtacha qiymati 1,849,650.0 joriy narxlarda, mlrd.so'mni tashkil etgan [1]."
+      "answer": "2025-yil holatiga ko'ra, O'zbekiston Respublikasi bo'yicha O‘zbekiston Respublikasining o'rtacha qiymati 1,849,650.0 joriy narxlarda, mlrd.so'mni tashkil etgan [1]."
     },
     {
       "id": 12,
@@ -198,13 +198,13 @@
       "question": "2025-yilda ishsizlik darajasi necha foizni tashkil etdi?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.266,
+      "latency_sec": 1.182,
       "passed": true,
       "reason": "OK",
       "selected_id": 1875,
       "unit": "foiz",
       "row_count": 12,
-      "answer": "2025 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha O‘zbekiston Respublikasining o'rtacha qiymati 4.8 foizni tashkil etgan [1]."
+      "answer": "2025-yil holatiga ko'ra, O'zbekiston Respublikasi bo'yicha O‘zbekiston Respublikasining o'rtacha qiymati 4.8 foizni tashkil etgan [1]."
     },
     {
       "id": 13,
@@ -212,13 +212,13 @@
       "question": "2025-yilda sanoat mahsulotlari ishlab chiqarish hajmi qancha edi?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.794,
+      "latency_sec": 1.719,
       "passed": true,
       "reason": "OK",
       "selected_id": 604,
       "unit": "Mlrd. so'm",
       "row_count": 12,
-      "answer": "2025 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Oziq-ovqat mahsulotlari ishlab chiqarishning o'rtacha qiymati 214,613.1 Mlrd. so'mni tashkil etgan [1]."
+      "answer": "2025-yil holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Oziq-ovqat mahsulotlari ishlab chiqarishning o'rtacha qiymati 214,613.1 Mlrd so'mni tashkil etgan [1]."
     },
     {
       "id": 14,
@@ -226,7 +226,7 @@
       "question": "2025-yilda qishloq xo'jaligi mahsulotlari umumiy hajmi qancha bo'lgan?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.473,
+      "latency_sec": 1.831,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -240,13 +240,13 @@
       "question": "2026-yil sentyabr oyida eksport hajmi qanchani tashkil etdi?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.351,
+      "latency_sec": 1.175,
       "passed": true,
       "reason": "OK",
       "selected_id": 2407,
       "unit": "mln.AQSH dollari",
       "row_count": 12,
-      "answer": "2026-M09 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha O‘zbekiston Respublikasining o'rtacha qiymati 25,843.1 mln.AQSH dollarini tashkil etgan [1]."
+      "answer": "2026-yil sentyabr oyi holatiga ko'ra, O'zbekiston Respublikasi bo'yicha O‘zbekiston Respublikasining o'rtacha qiymati 25,843.1 mln.AQSH dollarini tashkil etgan [1]."
     },
     {
       "id": 16,
@@ -254,7 +254,7 @@
       "question": "Poytaxtda 10 ta tuxum necha pul bo'lyapti?",
       "type": "colloquial",
       "http_status": 200,
-      "latency_sec": 1.019,
+      "latency_sec": 1.183,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -268,7 +268,7 @@
       "question": "Oylik maoshlar o'rtacha qancha chiqyapti?",
       "type": "colloquial",
       "http_status": 200,
-      "latency_sec": 1.905,
+      "latency_sec": 2.316,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -282,7 +282,7 @@
       "question": "O'zbekistonda hozir nechta odam yashaydi?",
       "type": "colloquial",
       "http_status": 200,
-      "latency_sec": 1.04,
+      "latency_sec": 1.558,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -296,7 +296,7 @@
       "question": "Samarqandda go'sht narxi qanaqa?",
       "type": "colloquial",
       "http_status": 200,
-      "latency_sec": 0.991,
+      "latency_sec": 1.198,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -310,13 +310,13 @@
       "question": "Toshkentda 1 kg mol go'shti necha pul turadi?",
       "type": "colloquial",
       "http_status": 200,
-      "latency_sec": 1.365,
+      "latency_sec": 1.182,
       "passed": true,
       "reason": "OK",
       "selected_id": 1308,
       "unit": "so'm (1 kg)",
       "row_count": 12,
-      "answer": "2026-M09 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Mol go'shtining o'rtacha qiymati 127,857.3 so'm (1 kg)ni tashkil etgan [1]."
+      "answer": "2026-yil sentyabr oyi holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Mol go'shtining o'rtacha qiymati 127,857.3 so'm (1 kg)ni tashkil etgan [1]."
     },
     {
       "id": 21,
@@ -324,13 +324,13 @@
       "question": "Poytaxtda oylik qancha?",
       "type": "colloquial",
       "http_status": 200,
-      "latency_sec": 1.574,
+      "latency_sec": 1.407,
       "passed": true,
       "reason": "OK",
       "selected_id": 500,
       "unit": "so'm",
       "row_count": 9,
-      "answer": "2025 holatiga ko'ra, Toshkent shahri bo'yicha Toshkent shahrining o'rtacha qiymati 8,708,341.5 so'mni tashkil etgan [1]."
+      "answer": "2025-yil holatiga ko'ra, Toshkent shahri bo'yicha Toshkent shahrining o'rtacha qiymati 8,708,341.5 so'mni tashkil etgan [1]."
     },
     {
       "id": 22,
@@ -338,13 +338,13 @@
       "question": "Samarqandda qancha odam yashaydi?",
       "type": "colloquial",
       "http_status": 200,
-      "latency_sec": 1.428,
+      "latency_sec": 1.323,
       "passed": true,
       "reason": "OK",
       "selected_id": 246,
       "unit": "ming kishi",
       "row_count": 12,
-      "answer": "2026 holatiga ko'ra, Samarqand viloyati bo'yicha Samarqand viloyatining o'rtacha qiymati 4,379.8 ming kishini tashkil etgan [1]."
+      "answer": "2026-yil holatiga ko'ra, Samarqand viloyati bo'yicha Samarqand viloyatining o'rtacha qiymati 4,379.8 ming kishini tashkil etgan [1]."
     },
     {
       "id": 23,
@@ -352,7 +352,7 @@
       "question": "Bozorda shakar necha pul bo'lyapti?",
       "type": "colloquial",
       "http_status": 200,
-      "latency_sec": 1.153,
+      "latency_sec": 1.623,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -366,7 +366,7 @@
       "question": "Bugungi kunda kartoshka qanchadan sotilyapti?",
       "type": "colloquial",
       "http_status": 200,
-      "latency_sec": 1.281,
+      "latency_sec": 1.452,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -380,7 +380,7 @@
       "question": "O'tgan yili YAIM qanchaga yetdi?",
       "type": "colloquial",
       "http_status": 200,
-      "latency_sec": 1.289,
+      "latency_sec": 1.496,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -394,7 +394,7 @@
       "question": "2026-yilda mol go'shti narxi qaysi oyda eng baland bo'lgan?",
       "type": "analytical",
       "http_status": 200,
-      "latency_sec": 1.084,
+      "latency_sec": 1.251,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -408,7 +408,7 @@
       "question": "2026-yilda mol go'shti narxi qaysi oyda eng arzon bo'lgan?",
       "type": "analytical",
       "http_status": 200,
-      "latency_sec": 1.059,
+      "latency_sec": 1.197,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -422,13 +422,13 @@
       "question": "2026-yilda aholi soni bo'yicha Toshkent shahri va Samarqand viloyatini solishtir",
       "type": "analytical",
       "http_status": 200,
-      "latency_sec": 2.578,
+      "latency_sec": 2.77,
       "passed": true,
       "reason": "OK",
-      "selected_id": null,
-      "unit": null,
-      "row_count": 2,
-      "answer": "• 2026 holatiga ko'ra, Toshkent shahrida Toshkent shahrining o'rtacha qiymati 3,178.1 ming kishini tashkil etgan [1]. • 2025 holatiga ko'ra, Samarqand viloyatida Samarqand viloyatining o'rtacha qiymati 106,266.0 kishini tashkil etgan [2]."
+      "selected_id": 246,
+      "unit": "ming kishi",
+      "row_count": 12,
+      "answer": "1. 2026-yil holatiga ko'ra, Toshkent shahrida Doimiy aholi soni  (jami) 3,178.1 ming kishini tashkil etgan [1].\n2. 2025-yil holatiga ko'ra, Samarqand viloyatida Tug`ilganlar soni (jami) 106,266.0 kishini tashkil etgan [2]."
     },
     {
       "id": 29,
@@ -436,13 +436,13 @@
       "question": "2025 va 2026-yilda aholi soni qanchaga o'zgardi?",
       "type": "analytical",
       "http_status": 200,
-      "latency_sec": 1.447,
+      "latency_sec": 1.372,
       "passed": true,
       "reason": "OK",
       "selected_id": 2441,
       "unit": "Ming kishi",
       "row_count": 2,
-      "answer": "O‘zbekiston Respublikasi (Doimiy aholi soni  (jami)) qiymati O'zbekiston Respublikasi bo'yicha 2025 davrida 37,543.2 Ming kishidan 2026 davrida 38,236.7 Ming kishigacha o'zgardi (o'zgarish: +1.8%) [1]."
+      "answer": "O‘zbekiston Respublikasi (Doimiy aholi soni  (jami)) qiymati O'zbekiston Respublikasi bo'yicha 2025-yil davrida 37,543.2 Ming kishidan 2026-yil davrida 38,236.7 Ming kishigacha o'zgardi (o'zgarish: +1.8%) [1]."
     },
     {
       "id": 30,
@@ -450,13 +450,13 @@
       "question": "2021-yildan 2026-yilgacha mol go'shti narxi qanday o'zgardi?",
       "type": "analytical",
       "http_status": 200,
-      "latency_sec": 1.554,
+      "latency_sec": 1.115,
       "passed": true,
       "reason": "OK",
       "selected_id": 1308,
       "unit": "so'm (1 kg)",
       "row_count": 24,
-      "answer": "Mol go'shti (Bozorlar va do‘konlardagi ayrim tovarlarning o‘rtacha narxlari dinamikasi) qiymati O'zbekiston Respublikasi bo'yicha 2021-M01 davrida 59,081.6 so'm (1 kg)dan 2026-M09 davrida 127,857.3 so'm (1 kg)gacha o'zgardi [1]."
+      "answer": "Mol go'shti (Bozorlar va do‘konlardagi ayrim tovarlarning o‘rtacha narxlari dinamikasi) qiymati O'zbekiston Respublikasi bo'yicha 2021-yil yanvar oyi davrida 59,081.6 so'm (1 kg)dan 2026-yil sentyabr oyi davrida 127,857.3 so'm (1 kg)gacha o'zgardi [1]."
     },
     {
       "id": 31,
@@ -464,7 +464,7 @@
       "question": "2020 va 2025-yillarda yalpi ichki mahsulot hajmi qanday o'zgardi?",
       "type": "analytical",
       "http_status": 200,
-      "latency_sec": 1.169,
+      "latency_sec": 1.372,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -478,13 +478,13 @@
       "question": "2021-yildan 2025-yilgacha ishsizlik darajasi dinamikasi qanday bo'lgan?",
       "type": "analytical",
       "http_status": 200,
-      "latency_sec": 1.395,
+      "latency_sec": 1.191,
       "passed": true,
       "reason": "OK",
       "selected_id": 1875,
       "unit": "foiz",
       "row_count": 2,
-      "answer": "O‘zbekiston Respublikasi (Ishsizlik darajasi) qiymati O'zbekiston Respublikasi bo'yicha 2021 davrida 9.6 foizdan 2025 davrida 4.8 foizgacha o'zgardi (o'zgarish: -50.0%) [1]."
+      "answer": "O‘zbekiston Respublikasi (Ishsizlik darajasi) qiymati O'zbekiston Respublikasi bo'yicha 2021-yil davrida 9.6 foizdan 2025-yil davrida 4.8 foizgacha o'zgardi (o'zgarish: -50.0%) [1]."
     },
     {
       "id": 33,
@@ -492,13 +492,13 @@
       "question": "2026-yil 3-chorakda oylik ish haqi bo'yicha qaysi hudud eng yuqori?",
       "type": "analytical",
       "http_status": 200,
-      "latency_sec": 1.831,
+      "latency_sec": 1.493,
       "passed": true,
       "reason": "OK",
       "selected_id": 522,
       "unit": "so'm",
       "row_count": 24,
-      "answer": "2026-Q3 holatiga ko'ra, O'rtacha hisoblangan oylik ish haqi (choraklik) bo'yicha eng yuqori ko'rsatkich O'zbekiston Respublikasida 12,300,801.3 so'mni tashkil etgan [1]. O'zbekiston Respublikasi bo'yicha umumiy qiymat 7,274,102.0 so'mga teng [1]."
+      "answer": "2026-yil 3-chorak holatiga ko'ra, O'rtacha hisoblangan oylik ish haqi (choraklik) bo'yicha eng yuqori ko'rsatkich O'zbekiston Respublikasida 12,300,801.3 so'mni tashkil etgan [1] O'zbekiston Respublikasi bo'yicha umumiy qiymat 7,274,102.0 so'mga teng [1]."
     },
     {
       "id": 34,
@@ -506,13 +506,13 @@
       "question": "2026-yilda doimiy aholi soni bo'yicha qaysi viloyat eng yuqori?",
       "type": "analytical",
       "http_status": 200,
-      "latency_sec": 1.643,
+      "latency_sec": 1.975,
       "passed": true,
       "reason": "OK",
       "selected_id": 246,
       "unit": "ming kishi",
       "row_count": 24,
-      "answer": "2026 holatiga ko'ra, Doimiy aholi soni  (jami) bo'yicha eng yuqori ko'rsatkich O'zbekiston Respublikasida 4,379.8 ming kishini tashkil etgan [1]. O'zbekiston Respublikasi bo'yicha umumiy qiymat 38,236.7 ming kishiga teng [1]."
+      "answer": "2026-yil holatiga ko'ra, Doimiy aholi soni  (jami) bo'yicha eng yuqori ko'rsatkich O'zbekiston Respublikasida 4,379.8 ming kishini tashkil etgan [1] O'zbekiston Respublikasi bo'yicha umumiy qiymat 38,236.7 ming kishiga teng [1]."
     },
     {
       "id": 35,
@@ -520,13 +520,13 @@
       "question": "2024 va 2025-yillarda YAIM o'sish sur'ati qanday bo'ldi?",
       "type": "analytical",
       "http_status": 200,
-      "latency_sec": 1.83,
+      "latency_sec": 1.862,
       "passed": true,
       "reason": "OK",
       "selected_id": 1921,
       "unit": "%",
       "row_count": 2,
-      "answer": "O‘zbekiston Respublikasi (Yalpi ichki mahsulotning o'sish sur'ati) qiymati O'zbekiston Respublikasi bo'yicha 2024 davrida 106.7 %dan 2025 davrida 107.7 %gacha o'zgardi (o'zgarish: +0.9%) [1]."
+      "answer": "O‘zbekiston Respublikasi (Yalpi ichki mahsulotning o'sish sur'ati) qiymati O'zbekiston Respublikasi bo'yicha 2024-yil davrida 106.7 %dan 2025-yil davrida 107.7 %gacha o'zgardi (o'zgarish: +0.9%) [1]."
     },
     {
       "id": 36,
@@ -534,7 +534,7 @@
       "question": "Bug'doy yetishtirish narxi 1 kg so'mda qancha bo'lgan?",
       "type": "trap_refusal",
       "http_status": 200,
-      "latency_sec": 1.079,
+      "latency_sec": 1.503,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -548,7 +548,7 @@
       "question": "Paxta ishlab chiqarish narxi qancha so'm?",
       "type": "trap_refusal",
       "http_status": 200,
-      "latency_sec": 1.219,
+      "latency_sec": 1.409,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -562,13 +562,13 @@
       "question": "2026-yil mart oyida (2026-M03) mol go'shti narxi qancha edi?",
       "type": "factual",
       "http_status": 200,
-      "latency_sec": 1.339,
+      "latency_sec": 1.308,
       "passed": true,
       "reason": "OK",
       "selected_id": 1308,
       "unit": "so'm (1 kg)",
       "row_count": 12,
-      "answer": "2026-M03 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Mol go'shtining o'rtacha qiymati 115,619.7 so'm (1 kg)ni tashkil etgan [1]."
+      "answer": "2026-yil mart oyi holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Mol go'shtining o'rtacha qiymati 115,619.7 so'm (1 kg)ni tashkil etgan [1]."
     },
     {
       "id": 39,
@@ -576,41 +576,41 @@
       "question": "2026-yil dekabrda mol go'shti narxi qancha bo'lgan?",
       "type": "trap_refusal",
       "http_status": 200,
-      "latency_sec": 1.703,
+      "latency_sec": 1.16,
       "passed": true,
       "reason": "OK",
       "selected_id": 1308,
       "unit": "so'm (1 kg)",
       "row_count": 12,
-      "answer": "2026-yil dekabr oyi bo'yicha rasmiy statistik ma'lumotlar Davlat statistika agentligi tomonidan hali e'lon qilinmagan (bazada mavjud emas). Bazadagi eng so'nggi tasdiqlangan davr — 2026-M09 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Mol go'shtining o'rtacha qiymati 127,857.3 so'm (1 kg)ni tashkil etgan [1]."
+      "answer": "2026-yil dekabr oyi bo'yicha rasmiy statistik ma'lumotlar Davlat statistika agentligi tomonidan hali e'lon qilinmagan (bazada mavjud emas) Bazadagi eng so'nggi tasdiqlangan davr — 2026-yil sentyabr oyi holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Mol go'shtining o'rtacha qiymati 127,857.3 so'm (1 kg)ni tashkil etgan [1]."
     },
     {
       "id": 40,
       "category": "Provokatsion/Tuzoq",
       "question": "2030-yilda O'zbekistonda o'rtacha maosh qancha bo'ladi?",
-      "type": "trap_refusal",
+      "type": "forecast",
       "http_status": 200,
-      "latency_sec": 0.029,
+      "latency_sec": 5.025,
       "passed": true,
       "reason": "OK",
-      "selected_id": null,
-      "unit": null,
-      "row_count": 0,
-      "answer": "Kechirasiz, Aethelgard · SIAT tizimi faqat O'zbekiston Davlat statistika agentligining rasmiy retrospektiv ma'lumotlari (2026-yil sentyabrgacha bo'lgan davr) asosida ishlaydi. 2027-yil va undan keyingi kelajak prognozlari rasmiy statistik DWH bazasida mavjud emas."
+      "selected_id": 500,
+      "unit": "so'm",
+      "row_count": 14,
+      "answer": "2030-yil uchun O‘zbekiston Respublikasi bo'yicha matematik ML prognoz (ARIMA(1, 1, 0) modeli asosida) 6,585,643.0 so'mni tashkil etadi (95% ishonch oralig'i: 5,446,964.8 — 7,724,321.1 so'm, MAPE: 11.81%) Ushbu ko'rsatkich rasmiy statistika emas, balki 2017 - 2025 yillardagi 9 ta retrospektiv DWH faktlariga asoslangan matematik ekstrapolyatsiyadir [1]."
     },
     {
       "id": 41,
       "category": "Provokatsion/Tuzoq",
       "question": "2035-yilda Toshkentda aholi soni nechtaga yetadi?",
-      "type": "trap_refusal",
+      "type": "forecast",
       "http_status": 200,
-      "latency_sec": 0.032,
+      "latency_sec": 1.712,
       "passed": true,
       "reason": "OK",
-      "selected_id": null,
-      "unit": null,
-      "row_count": 0,
-      "answer": "Kechirasiz, Aethelgard · SIAT tizimi faqat O'zbekiston Davlat statistika agentligining rasmiy retrospektiv ma'lumotlari (2026-yil sentyabrgacha bo'lgan davr) asosida ishlaydi. 2027-yil va undan keyingi kelajak prognozlari rasmiy statistik DWH bazasida mavjud emas."
+      "selected_id": 246,
+      "unit": "ming kishi",
+      "row_count": 24,
+      "answer": "2035-yil uchun Toshkent shahri bo'yicha matematik ML prognoz (ARIMA(1, 1, 0) modeli asosida) 3,537.2 ming kishini tashkil etadi (95% ishonch oralig'i: 1,961.4 — 5,113.0 ming kishi, MAPE: 0.17%) Ushbu ko'rsatkich rasmiy statistika emas, balki 2010 - 2026 yillardagi 17 ta retrospektiv DWH faktlariga asoslangan matematik ekstrapolyatsiyadir [1]."
     },
     {
       "id": 42,
@@ -618,13 +618,13 @@
       "question": "2026-yil sentyabrda mol go'shti narxi 45 000 so'mga tushgani rostmi?",
       "type": "false_premise_fact",
       "http_status": 200,
-      "latency_sec": 1.331,
+      "latency_sec": 1.163,
       "passed": true,
       "reason": "OK",
       "selected_id": 1308,
       "unit": "so'm (1 kg)",
       "row_count": 12,
-      "answer": "2026-M09 holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Mol go'shtining o'rtacha qiymati 127,857.3 so'm (1 kg)ni tashkil etgan [1]."
+      "answer": "2026-yil sentyabr oyi holatiga ko'ra, O'zbekiston Respublikasi bo'yicha Mol go'shtining o'rtacha qiymati 127,857.3 so'm (1 kg)ni tashkil etgan [1]."
     },
     {
       "id": 43,
@@ -632,7 +632,7 @@
       "question": "2026-yilda O'zbekiston aholisi 100 millionga yetgani to'g'rimi?",
       "type": "false_premise_fact",
       "http_status": 200,
-      "latency_sec": 1.021,
+      "latency_sec": 1.284,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -646,7 +646,7 @@
       "question": "1895-yilda Andijon viloyatida o'rtacha oylik ish haqi qancha bo'lgan?",
       "type": "trap_refusal",
       "http_status": 200,
-      "latency_sec": 1.569,
+      "latency_sec": 1.553,
       "passed": true,
       "reason": "OK",
       "selected_id": 500,
@@ -660,7 +660,7 @@
       "question": "2026-yilda Samarqanddagi Bitcoin zaxiralari hajmi qancha?",
       "type": "trap_refusal",
       "http_status": 200,
-      "latency_sec": 0.03,
+      "latency_sec": 0.008,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -674,7 +674,7 @@
       "question": "Toshkentda iPhone 16 Pro Max narxi qancha?",
       "type": "trap_refusal",
       "http_status": 200,
-      "latency_sec": 1.03,
+      "latency_sec": 1.375,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -688,7 +688,7 @@
       "question": "Ertaga ob-havo qanday bo'ladi?",
       "type": "trap_refusal",
       "http_status": 200,
-      "latency_sec": 0.031,
+      "latency_sec": 0.01,
       "passed": true,
       "reason": "OK",
       "selected_id": null,
@@ -702,7 +702,7 @@
       "question": "Bazadagi eng so'nggi yangilangan ma'lumotlar qaysi yilga tegishli?",
       "type": "meta",
       "http_status": 200,
-      "latency_sec": 2.775,
+      "latency_sec": 1.354,
       "passed": true,
       "reason": "OK",
       "selected_id": 1308,
@@ -716,7 +716,7 @@
       "question": "Qishloq xo'jaligi bo'yicha qanday ko'rsatkichlar bor?",
       "type": "meta",
       "http_status": 200,
-      "latency_sec": 2.815,
+      "latency_sec": 1.302,
       "passed": true,
       "reason": "OK",
       "selected_id": 1308,
@@ -730,7 +730,7 @@
       "question": "Bazadagi jami ko'rsatkichlar soni nechta?",
       "type": "meta",
       "http_status": 200,
-      "latency_sec": 2.797,
+      "latency_sec": 1.311,
       "passed": true,
       "reason": "OK",
       "selected_id": 1308,

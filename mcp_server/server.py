@@ -225,6 +225,29 @@ def compare_items(
     )
 
 
+@mcp.tool()
+def forecast_indicator(
+    indicator_id: int,
+    target_year: int,
+    item_code: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Muayyan ko'rsatkichning retrospektiv vaqt qatori asosida kelgusi davrlar (2027-2036)
+    uchun matematik ML prognozini hisoblaydi (Ridge Regression, Holt-Winters ETS, ARIMA).
+
+    Args:
+        indicator_id: Ko'rsatkich ID si (masalan: 1308, 273).
+        target_year: Prognoz qilinayotgan kelajak yili (2027-2036).
+        item_code: Muayyan tovar yoki hudud kodi (ixtiyoriy).
+    """
+    return tools.forecast_indicator(
+        indicator_id=indicator_id,
+        target_year=target_year,
+        item_code=item_code
+    )
+
+
+
 # -----------------------------------------------------------------------------
 # 3. Serverni ishga tushirish
 # -----------------------------------------------------------------------------

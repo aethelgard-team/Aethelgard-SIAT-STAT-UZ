@@ -200,17 +200,22 @@ RU_TO_UZ_TERMS = [
     (r"\bнаселени[еяюем]\b", "doimiy aholi soni"),
     (r"\bжителей\b", "doimiy aholi soni"),
     (r"\bсреднемесячная\s+номинальная\s+заработная\s+плата\b", "o'rtacha hisoblangan oylik ish haqi"),
+    (r"\bуров(?:ень|ня)\s+средней\s+заработной\s+платы\b", "o'rtacha hisoblangan oylik ish haqi"),
+    (r"\bуров(?:ень|ня)\s+средней\s+зарплаты\b", "o'rtacha hisoblangan oylik ish haqi"),
+    (r"\bуров(?:ень|ня)\s+зарплаты\b", "o'rtacha hisoblangan oylik ish haqi"),
     (r"\bзаработная\s+плата\b", "o'rtacha hisoblangan oylik ish haqi"),
     (r"\bзарплат[аыуеой]\b", "o'rtacha hisoblangan oylik ish haqi"),
     (r"\bоклад[аеом]?\b", "ish haqi"),
     (r"\bввп\b", "yalpi ichki mahsulot"),
     (r"\bваловой\s+внутренний\s+продукт\b", "yalpi ichki mahsulot"),
     (r"\bврп\b", "yalpi hududiy mahsulot"),
+    (r"\bуров(?:ень|ня)\s+инфляции\b", "iste'mol narxlari indeksi"),
     (r"\bинфляци[яиеюей]\b", "iste'mol narxlari indeksi"),
     (r"\bэкспорт[аеом]?\b", "tovarlar eksporti"),
     (r"\bимпорт[аеом]?\b", "tovarlar importi"),
     (r"\bбезработиц[аыуеой]\b", "ishsizlik darajasi"),
     (r"\bуровень\s+безработицы\b", "ishsizlik darajasi"),
+    (r"\bуров[ень|ня|ню|нем|не]+\b", "darajasi"),
 
     # Vaqt va davrlar (Ruscha)
     (r"\bв\s+январе\b", "yanvarda"),
@@ -385,8 +390,82 @@ def normalize_typos_and_morphology(text: str) -> str:
 
 
 # -----------------------------------------------------------------------------
-# 6. Salomlashish / Yordam Qidiruvini Aniqlash (Greeting & Help)
+# 6.6. Prognoz va Kelajak So'rovlarini Aniqlash (Forecast Intent Detection)
 # -----------------------------------------------------------------------------
+
+FORECAST_KEYWORDS_PATTERNS = [
+    # Uzbek Latin
+    r"\bprognoz(?:i|lar|lari|lash|ga)?\b",
+    r"\bbashorat(?:i|lar|lari|lash|ga)?\b",
+    r"\bkelajak(?:da|gi|dagi)?\b",
+    r"\bkutilmoqda\b",
+    r"\bkutiladi\b",
+    r"\bkutilayotgan\b",
+    r"\bbo['`]?ladi\b",
+    r"\bboladi\b",
+    r"\bbo['`]?lishi\b",
+    r"\byetadi\b",
+    # Uzbek Cyrillic
+    r"\bпрогноз(?:и|лар|лари|лаш|га)?\b",
+    r"\bбашорат(?:и|лар|лари|лаш|га)?\b",
+    r"\bкелажак(?:да|ги|даги)?\b",
+    r"\bкутилмоқда\b",
+    r"\bкутилади\b",
+    r"\bбўлади\b",
+    r"\bетади\b",
+    # Russian
+    r"\bпрогноз(?:ы|а|ов|ирование)?\b",
+    r"\bспрогнозируй(?:те)?\b",
+    r"\bбудет\b",
+    r"\bбудут\b",
+    r"\bожидает(?:ся|мые|мый)\b",
+    r"\bперспектив[аые]\b",
+]
+
+OUT_OF_SCOPE_PATTERNS = [
+    r"\b(?:bitcoin|bitkoin|kripto|криптовалют)\b",
+    r"\b(?:ob-havo|obhavo|weather|погода)\b",
+    r"\b(?:kurs\s+dollar|valyuta\s+kursi|dollar\s+kursi|курс\s+доллара)\b",
+    r"\b(?:futbol|sport|kino|film|qo'shiq|музыка)\b"
+]
+
+def is_out_of_scope_query(text: str) -> bool:
+    """SIAT doirasiga kirmaydigan mavzular (kripto, ob-havo, valyuta kursi va h.k.) ni aniqlaydi."""
+    t = text.lower()
+    return any(bool(re.search(pat, t)) for pat in OUT_OF_SCOPE_PATTERNS)
+
+def detect_forecast_intent(text: str, years: Optional[List[int]] = None) -> Dict[str, Any]:
+    """
+    So'rovda kelajak prognozi niyati (2027-2036) yoki prognoz kalit so'zlari
+    mavjudligini aniqlaydi.
+    """
+    t_lower = text.lower()
+    extracted_years = years if years is not None else [int(y) for y in re.findall(r"\b(1[89]\d\d|20\d\d)\b", t_lower)]
+    
+    has_keyword = any(bool(re.search(pat, t_lower)) for pat in FORECAST_KEYWORDS_PATTERNS)
+    future_years = [y for y in extracted_years if y >= 2027]
+    
+    is_forecast = False
+    target_year: Optional[int] = None
+    is_extreme = False
+    
+    if future_years:
+        max_y = max(future_years)
+        is_forecast = True
+        target_year = max_y
+        if max_y > 2036:
+            is_extreme = True
+    elif has_keyword:
+        is_forecast = True
+        # Yil aytilmagan bo'lsa, bazadagi oxirgi yildan keyingi yil (2027) ga mo'ljallanadi
+        target_year = 2027
+        
+    return {
+        "is_forecast": is_forecast,
+        "target_year": target_year,
+        "is_extreme_forecast": is_extreme,
+        "has_forecast_keyword": has_keyword
+    }
 
 GREETING_PATTERNS = [
     r"^\s*(?:assalomu\s+alaykum|assalom\s+alaykum|salom|hayrli\s+kun|qalaysiz|qandaysiz)\s*[.!?]?\s*$",
@@ -614,6 +693,9 @@ def normalize_input_query(query: str) -> Dict[str, Any]:
         sp in canonical_uz.lower() for sp in ("mol", "qo'y", "qoy", "tovuq", "molniki", "qo'yniki")
     )
 
+    forecast_info = detect_forecast_intent(raw)
+    out_of_scope = is_out_of_scope_query(raw)
+
     return {
         "raw_query": raw,
         "response_lang": lang,
@@ -621,5 +703,10 @@ def normalize_input_query(query: str) -> Dict[str, Any]:
         "de_apostrophed": de_apostrophed,
         "is_greeting": is_greeting,
         "is_generic_meat": is_generic_meat,
+        "is_out_of_scope": out_of_scope,
+        "is_forecast": forecast_info["is_forecast"],
+        "target_year": forecast_info["target_year"],
+        "is_extreme_forecast": forecast_info["is_extreme_forecast"],
+        "has_forecast_keyword": forecast_info["has_forecast_keyword"],
         "sub_queries": split_compound_query(raw)
     }

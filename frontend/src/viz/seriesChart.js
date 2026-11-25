@@ -80,22 +80,69 @@ export function renderSeriesChart(container, rows, { unit = '', sourceUrl = '' }
     svg.append(t);
   }
 
-  // Chiziq: null qiymatlarda uziladi (yo'q narsani chizmaymiz)
-  let d = '';
-  let pen = false;
+  // Chiziq: Tarixiy qism tutash, ML prognoz qismi uzuq-uzuq (dashed amber) chiziladi
+  let dHist = '';
+  let dFore = '';
+  let penHist = false;
+  let penFore = false;
+  let lastHistPoint = null;
+
   series.forEach((r, i) => {
-    if (r.value === null || r.value === undefined) { pen = false; return; }
-    d += `${pen ? 'L' : 'M'}${x(i).toFixed(1)},${y(r.value).toFixed(1)} `;
-    pen = true;
+    if (r.value === null || r.value === undefined) {
+      penHist = false;
+      penFore = false;
+      return;
+    }
+    const ptX = x(i).toFixed(1);
+    const ptY = y(r.value).toFixed(1);
+
+    if (r.is_forecast || r.status === 'forecast') {
+      if (!penFore && lastHistPoint) {
+        dFore += `M${lastHistPoint.x},${lastHistPoint.y} L${ptX},${ptY} `;
+      } else {
+        dFore += `${penFore ? 'L' : 'M'}${ptX},${ptY} `;
+      }
+      penFore = true;
+    } else {
+      dHist += `${penHist ? 'L' : 'M'}${ptX},${ptY} `;
+      penHist = true;
+      lastHistPoint = { x: ptX, y: ptY };
+    }
   });
-  svg.append(svgEl('path', { d, class: 'line' }));
+
+  if (dHist) {
+    svg.append(svgEl('path', { d: dHist, class: 'line' }));
+  }
+  if (dFore) {
+    svg.append(svgEl('path', {
+      d: dFore,
+      class: 'line line-forecast',
+      stroke: '#F59E0B',
+      'stroke-width': '2.5',
+      'stroke-dasharray': '5,4',
+      fill: 'none'
+    }));
+  }
 
   // Nuqtalar — sichqoncha bilan ustiga borilsa aniq qiymat va davr
   series.forEach((r, i) => {
     if (r.value === null || r.value === undefined) return;
-    const dot = svgEl('circle', { cx: x(i), cy: y(r.value), r: 3.5, class: 'dot' });
+    const isFc = Boolean(r.is_forecast || r.status === 'forecast');
+    const dotAttrs = {
+      cx: x(i),
+      cy: y(r.value),
+      r: isFc ? 4.5 : 3.5,
+      class: isFc ? 'dot dot-forecast' : 'dot'
+    };
+    if (isFc) {
+      dotAttrs.fill = '#F59E0B';
+      dotAttrs.stroke = '#78350F';
+      dotAttrs['stroke-width'] = '1.5';
+    }
+    const dot = svgEl('circle', dotAttrs);
     const tip = svgEl('title');
-    tip.textContent = `${formatPeriodLabel(r.period_key)}: ${formatNumber(r.value)}${unit ? ` ${unit}` : ''}`;
+    const prefix = isFc ? '[ML PROGNOZ] ' : '';
+    tip.textContent = `${prefix}${formatPeriodLabel(r.period_key)}: ${formatNumber(r.value)}${unit ? ` ${unit}` : ''}`;
     dot.append(tip);
     svg.append(dot);
   });

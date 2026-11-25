@@ -190,3 +190,74 @@ def health_check():
             "database_connected": False,
             "error": str(e)
         }
+
+
+# -----------------------------------------------------------------------------
+# 7. GET /api/forecast (ML Vaqt Qatorlari Prognozi)
+# -----------------------------------------------------------------------------
+@router.get("/api/forecast", summary="ML Vaqt Qatorlari Prognozi")
+def get_forecast(
+    indicator_id: int = Query(..., description="Ko'rsatkich ID si (masalan: 1308)"),
+    target_year: int = Query(..., ge=2026, le=2036, description="Prognoz yili (2026-2036)"),
+    item_code: Optional[str] = Query(None, description="Mahsulot yoki hudud kodi (masalan: 017)")
+):
+    """
+    Muayyan ko'rsatkich bo'yicha kelgusi davrlar uchun matematik ML prognozini hisoblaydi
+    (Ridge Regression, Holt-Winters ETS, ARIMA).
+    """
+    res = tools.forecast_indicator(
+        indicator_id=indicator_id,
+        target_year=target_year,
+        item_code=item_code
+    )
+    if "error" in res:
+        raise HTTPException(status_code=404, detail=res["error"])
+    return res
+
+
+# -----------------------------------------------------------------------------
+# 8. GET /api/regions/compare
+# -----------------------------------------------------------------------------
+@router.get("/api/regions/compare", summary="Hududlar bo'yicha ko'rsatkichlarni solishtirish")
+def compare_regions_endpoint(
+    indicator_id: int = Query(..., description="Ko'rsatkich ID si (masalan: 273)"),
+    period: str = Query("2024", description="Davr kaliti (masalan: 2024, 2026-M09)")
+):
+    """Hududlar (viloyatlar va shaharlar) reytingini solishtiradi."""
+    return tools.compare_regions(indicator_id=indicator_id, period=period)
+
+
+# -----------------------------------------------------------------------------
+# 9. GET /api/periods
+# -----------------------------------------------------------------------------
+@router.get("/api/periods", summary="Mavjud davrlar ro'yxati")
+def get_periods_endpoint(
+    indicator_id: int = Query(..., description="Ko'rsatkich ID si (masalan: 1308)")
+):
+    """Ko'rsatkich bo'yicha mavjud davrlar va yillar ro'yxati."""
+    res = tools.get_available_periods(indicator_id=indicator_id)
+    if "error" in res:
+        raise HTTPException(status_code=404, detail=res["error"])
+    return res
+
+
+# -----------------------------------------------------------------------------
+# 10. GET /api/data
+# -----------------------------------------------------------------------------
+@router.get("/api/data", summary="Faktik statistik qiymatlar")
+def get_data_endpoint(
+    indicator_id: int = Query(..., description="Ko'rsatkich ID si"),
+    item_codes: Optional[str] = Query(None, description="Vergul bilan ajratilgan kodlar"),
+    periods: Optional[str] = Query(None, description="Vergul bilan ajratilgan davrlar"),
+    limit: int = Query(500, ge=1, le=1000)
+):
+    """Faktik statistik qiymatlarni oladi."""
+    codes_list = [c.strip() for c in item_codes.split(",")] if item_codes else None
+    periods_list = [p.strip() for p in periods.split(",")] if periods else None
+    return tools.get_data(
+        indicator_id=indicator_id,
+        item_codes=codes_list,
+        periods=periods_list,
+        limit=limit
+    )
+
