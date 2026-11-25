@@ -47,6 +47,10 @@ export function initAskView({ scene, inspector, demo = null }) {
   let currentSubResults = null;
   let activeSubIndex = 1;
   let lastSources = [];
+  let lastResultRows = [];
+  let lastUnit = '';
+  let lastIndicatorName = '';
+  let lastRegionName = '';
 
   // Shu savoldagi barcha voqealar: [{ name, data, t }] — inspektor va demo yozuvi uchun
   let log = [];
@@ -142,53 +146,93 @@ export function initAskView({ scene, inspector, demo = null }) {
   const kpi = (id, v) => { const n = $(id); if (n) n.textContent = v; };
   function setMeta(id, v) { $(id).textContent = v ?? '—'; }
 
-  function showFigure(rows, unit, indicatorName = '', regionName = '', customPeriod = '') {
+  function showFigure(rows, unit, indicatorName = '', regionName = '', customPeriod = '', forecastMeta = null) {
     const fig = $('#r-figure');
     const valid = rows.filter((r) => r.value !== null && r.value !== undefined && !Number.isNaN(Number(r.value)));
     if (!valid.length) { fig.hidden = true; return; }
 
-    // Asosiy raqam: savoldagi davr va mahsulot; topilmasa — eng oxirgi davr
+    const isForecast = Boolean(forecastMeta?.is_forecast || valid.some((r) => r.is_forecast || r.status === 'forecast'));
+
+    // Asosiy raqam: savoldagi davr va mahsulot; prognoz bo'lsa - prognoz ustuni
     const sorted = [...valid].sort((a, b) => periodOf(a).localeCompare(periodOf(b)));
-    const main = sorted.find((r) => periodOf(r) && periodOf(r) === parsed.detected_period
-      && (!parsed.detected_item_code || r.item_code === parsed.detected_item_code))
-      ?? sorted.find((r) => r.is_target)
-      ?? sorted.findLast((r) => !parsed.detected_item_code || r.item_code === parsed.detected_item_code)
-      ?? sorted.at(-1);
-    const series = sorted.filter((r) => r.item_code === main.item_code);
+    let main;
+    if (isForecast) {
+      main = sorted.findLast((r) => r.is_forecast || r.status === 'forecast') || sorted.at(-1);
+    } else {
+      main = sorted.find((r) => periodOf(r) && periodOf(r) === parsed.detected_period
+        && (!parsed.detected_item_code || r.item_code === parsed.detected_item_code))
+        ?? sorted.find((r) => r.is_target)
+        ?? sorted.findLast((r) => !parsed.detected_item_code || r.item_code === parsed.detected_item_code)
+        ?? sorted.at(-1);
+    }
+    const series = sorted.filter((r) => !main.item_code || r.item_code === main.item_code);
 
     // Hudud va ko'rsatkich nomini aniq aks ettirish (Optimization 1: Strict Region Resolution)
     const finalRegion = regionName || main.region_name || parsed.detected_region || '';
     const labelTitle = main.item_name || indicatorName || '';
-    const pLabel = customPeriod || (periodOf(main) ? formatPeriodLabel(periodOf(main)) : '');
-    const isForecast = Boolean(main.is_forecast || main.status === 'forecast');
-    const badge = isForecast ? ` [ML PROGNOZ · ${main.model_used || 'ETS/ARIMA'}]` : '';
-    const finalLabel = (finalRegion && !labelTitle.includes(finalRegion)
-      ? joinParts(labelTitle, finalRegion, pLabel)
-      : joinParts(labelTitle, pLabel)) + badge;
+    const targetYear = forecastMeta?.target_year || main.target_year || (main.year ? String(main.year) : (periodOf(main) ? periodOf(main).slice(0, 4) : ''));
+    const modelUsed = forecastMeta?.model_used || main.model_used || 'ARIMA';
+
+    let finalLabel = '';
+    let displayValue = main.value;
+    if (isForecast) {
+      if (forecastMeta?.predicted_value !== undefined && forecastMeta.predicted_value !== null) {
+        displayValue = forecastMeta.predicted_value;
+      }
+      const pLabel = `${targetYear}-yil (ML PROGNOZ · ${modelUsed})`;
+      finalLabel = (finalRegion && !labelTitle.includes(finalRegion)
+        ? joinParts(labelTitle, finalRegion, pLabel)
+        : joinParts(labelTitle, pLabel));
+    } else {
+      const pLabel = customPeriod || (periodOf(main) ? formatPeriodLabel(periodOf(main)) : '');
+      finalLabel = (finalRegion && !labelTitle.includes(finalRegion)
+        ? joinParts(labelTitle, finalRegion, pLabel)
+        : joinParts(labelTitle, pLabel));
+    }
 
     $('#r-label').textContent = finalLabel;
-    $('#r-value').textContent = formatNumber(Number(main.value));
+    $('#r-value').textContent = formatNumber(Number(displayValue));
     $('#r-unit').textContent = unit || '';
 
-    // Oldingi davrga nisbatan o'zgarish (ikkala qiymat ham backenddan)
-    const idx = series.indexOf(main);
-    const prev = idx > 0 ? series[idx - 1] : null;
+    // Oldingi davrga yoki oxirgi haqiqiy DWH faktiga nisbatan o'zgarish
     const deltaEl = $('#r-delta');
     const capEl = $('#r-delta-cap');
-    if (prev && Number(prev.value)) {
-      const pct = ((Number(main.value) - Number(prev.value)) / Math.abs(Number(prev.value))) * 100;
-      deltaEl.className = `delta ${pct > 0.05 ? 'up' : pct < -0.05 ? 'down' : 'flat'}`;
-      deltaEl.textContent = `${pct > 0 ? '▲' : pct < 0 ? '▼' : '•'} ${Math.abs(pct).toFixed(1).replace('.', ',')}%`;
-      capEl.textContent = periodOf(prev) ? `${formatPeriodLabel(periodOf(prev))} ga nisbatan` : 'oldingi davrga nisbatan';
+    if (isForecast) {
+      const histPts = series.filter((r) => !r.is_forecast && r.status !== 'forecast');
+      const lastHist = histPts.length ? histPts[histPts.length - 1] : null;
+      const histVal = (forecastMeta?.last_actual_value !== undefined && forecastMeta.last_actual_value !== null)
+        ? Number(forecastMeta.last_actual_value)
+        : (lastHist ? Number(lastHist.value) : null);
+      const histPeriod = forecastMeta?.last_actual_period || (lastHist ? periodOf(lastHist) : '');
+
+      if (histVal && !Number.isNaN(histVal)) {
+        const pct = ((Number(displayValue) - histVal) / Math.abs(histVal)) * 100;
+        deltaEl.className = `delta ${pct > 0.05 ? 'up' : pct < -0.05 ? 'down' : 'flat'}`;
+        deltaEl.textContent = `${pct > 0 ? '▲' : pct < 0 ? '▼' : '•'} ${Math.abs(pct).toFixed(1).replace('.', ',')}%`;
+        const histPeriodLabel = histPeriod ? formatPeriodLabel(histPeriod) : 'oxirgi haqiqiy ko‘rsatkich';
+        capEl.textContent = `${histPeriodLabel}ga nisbatan`;
+      } else {
+        deltaEl.textContent = '';
+        capEl.textContent = '';
+      }
     } else {
-      deltaEl.textContent = '';
-      capEl.textContent = '';
+      const idx = series.indexOf(main);
+      const prev = idx > 0 ? series[idx - 1] : null;
+      if (prev && Number(prev.value)) {
+        const pct = ((Number(main.value) - Number(prev.value)) / Math.abs(Number(prev.value))) * 100;
+        deltaEl.className = `delta ${pct > 0.05 ? 'up' : pct < -0.05 ? 'down' : 'flat'}`;
+        deltaEl.textContent = `${pct > 0 ? '▲' : pct < 0 ? '▼' : '•'} ${Math.abs(pct).toFixed(1).replace('.', ',')}%`;
+        capEl.textContent = periodOf(prev) ? `${formatPeriodLabel(periodOf(prev))} ga nisbatan` : 'oldingi davrga nisbatan';
+      } else {
+        deltaEl.textContent = '';
+        capEl.textContent = '';
+      }
     }
 
     drawSpark($('#r-spark'), series.map((r) => Number(r.value)), series.indexOf(main));
     // To'liq ekran uchun: monitordagi kabi ustunlar (qiymatsiz oylar ham — "yo'q")
     const allRows = rows
-      .filter((r) => r.item_code === main.item_code)
+      .filter((r) => !main.item_code || r.item_code === main.item_code)
       .sort((a, b) => periodOf(a).localeCompare(periodOf(b)));
     drawBars($('#r-bars'), allRows, main, unit);
     $('#r-spark-cap').textContent = series.length > 1
@@ -238,7 +282,15 @@ export function initAskView({ scene, inspector, demo = null }) {
     scene?.showBars(targetSub.series, opts);
 
     // Katta KPI kartani yangilash
-    showFigure(targetSub.series, targetSub.unit, targetSub.title, targetSub.region, targetSub.period_label);
+    const fcMeta = targetSub.is_forecast ? {
+      is_forecast: true,
+      model_used: targetSub.model_used,
+      predicted_value: targetSub.predicted_value ?? targetSub.value,
+      target_year: targetSub.target_year,
+      last_actual_value: targetSub.last_actual_value,
+      last_actual_period: targetSub.last_actual_period
+    } : null;
+    showFigure(targetSub.series, targetSub.unit, targetSub.title, targetSub.region, targetSub.period_label, fcMeta);
 
     // Manbalar ro'yxatida faol bandni yangilash
     renderSources(sourcesEl, lastSources, currentSubResults, (idx) => selectSubResult(idx), activeSubIndex);
@@ -267,6 +319,10 @@ export function initAskView({ scene, inspector, demo = null }) {
     currentSubResults = null;
     activeSubIndex = 1;
     lastSources = [];
+    lastResultRows = [];
+    lastUnit = '';
+    lastIndicatorName = '';
+    lastRegionName = '';
     answerEl.textContent = '';
     answerEl.dataset.state = 'streaming';
     $('#r-figure').hidden = true;
@@ -465,7 +521,19 @@ export function initAskView({ scene, inspector, demo = null }) {
         };
         renderSeriesChart(chartEl, rows, opts);
         scene?.showBars(rows, opts);
-        showFigure(rows, d.unit ?? '', d.indicator_name ?? '', regionName);
+        const forecastMeta = d.is_forecast ? {
+          is_forecast: true,
+          model_used: d.model_used,
+          predicted_value: d.predicted_value,
+          target_year: d.target_year,
+          last_actual_value: d.last_actual_value,
+          last_actual_period: d.last_actual_period
+        } : null;
+        lastResultRows = rows;
+        lastUnit = d.unit ?? '';
+        lastIndicatorName = d.indicator_name ?? '';
+        lastRegionName = regionName;
+        showFigure(rows, d.unit ?? '', d.indicator_name ?? '', regionName, '', forecastMeta);
         if (!tableName && $('#m-table').textContent === '—') setMeta('#m-table', d.indicator_name);
         if (d.sub_results && d.sub_results.length >= 2) {
           currentSubResults = d.sub_results;
@@ -490,6 +558,20 @@ export function initAskView({ scene, inspector, demo = null }) {
         if (d.sub_results && d.sub_results.length >= 2) {
           currentSubResults = d.sub_results;
           renderCompoundTabs(currentSubResults);
+        }
+        if (d.primary_kpi && d.primary_kpi.is_forecast) {
+          const pk = d.primary_kpi;
+          const kpiMeta = {
+            is_forecast: true,
+            model_used: pk.model_used,
+            predicted_value: pk.value,
+            target_year: pk.target_year,
+            last_actual_value: pk.last_actual_value,
+            last_actual_period: pk.last_actual_period
+          };
+          if (lastResultRows && lastResultRows.length > 0) {
+            showFigure(lastResultRows, pk.unit || lastUnit, pk.title || lastIndicatorName, lastRegionName, pk.period_label, kpiMeta);
+          }
         }
         if (d.answer && d.answer.trim()) {
           answerEl.textContent = d.answer;
@@ -806,6 +888,7 @@ function drawBars(box, rows, main, unit) {
     const li = el('li', '', 'bar-item');
     if (r === main) li.dataset.main = 'true';
     if (!has) li.dataset.missing = 'true';
+    if (r.is_forecast || r.status === 'forecast') li.dataset.forecast = 'true';
     const val = el('span', has ? formatNumber(v) : 'yo‘q', 'bar-val');
     const col = el('span', '', 'bar-col');
     col.style.setProperty('--h', has ? `${12 + k * 88}%` : '60%');

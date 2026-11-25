@@ -191,11 +191,11 @@ async def _collect_sse_events(query: str) -> List[Dict[str, Any]]:
 
 
 def test_7_orchestrator_forecast_stream():
-    print("[TEST 7/8] Orchestrator: Yakka prognoz so'rovi SSE oqimi...")
+    print("[TEST 7/8] Orchestrator: Yakka prognoz so'rovi SSE oqimi (2030 mol go'shti)...")
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        events = loop.run_until_complete(_collect_sse_events("2029-yilda mol go'shti narxi qancha bo'ladi?"))
+        events = loop.run_until_complete(_collect_sse_events("2030-yilda mol go'shti narxi qancha bo'ladi?"))
     finally:
         loop.close()
 
@@ -211,10 +211,25 @@ def test_7_orchestrator_forecast_stream():
     assert tool_res_ev["data"].get("is_forecast") is True
     assert tool_res_ev["data"].get("predicted_value") is not None
 
+    chart_data = tool_res_ev["data"].get("data", [])
+    assert len(chart_data) > 0 and len(chart_data) <= 24, f"Chart series downsampling failed, length: {len(chart_data)}"
+    last_point = chart_data[-1]
+    assert last_point.get("period_key") == "2030" or last_point.get("year") == 2030, f"Last chart point is not 2030: {last_point}"
+    assert last_point.get("is_forecast") is True, "Last chart point is not marked as forecast"
+
     done_ev = next(e for e in events if e["event"] == "done")
     assert done_ev["data"].get("all_passed") is True
     ans = done_ev["data"].get("answer", "")
     assert "prognoz" in ans.lower() or "прогноз" in ans.lower()
+
+    primary_kpi = done_ev["data"].get("primary_kpi")
+    assert primary_kpi is not None, "primary_kpi is missing in done event"
+    assert primary_kpi.get("is_forecast") is True, "primary_kpi.is_forecast must be True"
+    assert primary_kpi.get("value") is not None and primary_kpi["value"] > 140000, f"Hero KPI value {primary_kpi.get('value')} is wrong (must be ~173,433, not 69,973)"
+    assert primary_kpi.get("last_actual_value") is not None, "last_actual_value missing in primary_kpi"
+    assert primary_kpi.get("last_actual_period") is not None, "last_actual_period missing in primary_kpi"
+    print(f"  -> [OK] Hero KPI: {primary_kpi['value']:,.1f} {primary_kpi.get('unit')} (last actual: {primary_kpi['last_actual_value']:,.1f} at {primary_kpi['last_actual_period']}).")
+    print(f"  -> [OK] Chart timeline length: {len(chart_data)} points (ending at {last_point.get('period_key')}).")
     print(f"  -> [OK] SSE oqimi to'liq o'tdi. Yakuniy javob: {ans[:90]}...")
 
 

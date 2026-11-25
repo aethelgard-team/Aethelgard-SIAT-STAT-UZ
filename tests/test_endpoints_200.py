@@ -89,8 +89,12 @@ def test_05_redoc():
 
 
 def test_06_static_assets():
+    import glob
+    from pathlib import Path
+    css_files = glob.glob("frontend/dist/assets/*.css")
+    asset_name = Path(css_files[0]).name if css_files else "index-Bi1_PeDY.css"
     t0 = time.time()
-    resp = client.get("/assets/index-BMvKsoyy.css")
+    resp = client.get(f"/assets/{asset_name}")
     lat = (time.time() - t0) * 1000
     passed = resp.status_code == 200 and len(resp.content) > 1000
     record_result("/assets/{filepath}", "GET", resp.status_code, lat, passed, f"Vite CSS aktivi yuklandi ({len(resp.content)} bayt)")
