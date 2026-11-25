@@ -234,7 +234,7 @@ def test_7_orchestrator_forecast_stream():
 
 
 def test_8_compound_mixed_forecast():
-    print("[TEST 8/8] Orchestrator: Murakkab aralash so'rov (tarixiy + prognoz)...")
+    print("[TEST 8/9] Orchestrator: Murakkab aralash so'rov (tarixiy + prognoz)...")
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -251,6 +251,56 @@ def test_8_compound_mixed_forecast():
     print(f"  -> [OK] Murakkab aralash so'rov (tarixiy + 2030 prognoz) 100% muvaffaqiyatli yakunlandi.")
 
 
+def test_9_russian_future_forecast_regression():
+    print("[TEST 9/9] Orchestrator: Rus tilidagi kelasi zamon va prognoz so'rovlari regr-testi...")
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        # 1. Mol go'shti 2029 prognozi (Ruscha)
+        events_beef = loop.run_until_complete(_collect_sse_events("Сколько будет стоить говядина в 2029 году?"))
+        search_ev = next(e for e in events_beef if e["event"] == "search.completed")
+        assert search_ev["data"].get("selected_indicator_id") == 1308, f"Wrong indicator: {search_ev['data']}"
+
+        tool_ev = next(e for e in events_beef if e["event"] == "tool.called")
+        assert tool_ev["data"].get("tool") == "forecast_indicator"
+        assert tool_ev["data"]["arguments"].get("target_year") == 2029
+        assert tool_ev["data"]["arguments"].get("item_code") == "017"
+
+        res_ev = next(e for e in events_beef if e["event"] == "tool.result")
+        assert res_ev["data"].get("is_forecast") is True
+        pred_val = res_ev["data"].get("predicted_value")
+        assert pred_val is not None and pred_val > 135000, f"Predicted beef price {pred_val} is too low"
+
+        done_beef = next(e for e in events_beef if e["event"] == "done")
+        assert done_beef["data"].get("all_passed") is True
+        pk_beef = done_beef["data"].get("primary_kpi")
+        assert pk_beef is not None and pk_beef.get("is_forecast") is True
+        assert pk_beef.get("value") > 135000
+        ans_beef = done_beef["data"].get("answer", "")
+        assert "прогноз" in ans_beef.lower() and "составляет" in ans_beef.lower(), f"Answer is not Russian: {ans_beef}"
+        print(f"  -> [OK] 2029 говядина: {pred_val:,.1f} so'm (#1308), javob rus tilida tasdiqlandi.")
+
+        # 2. Toshkent aholisi 2030 prognozi (Ruscha)
+        events_pop = loop.run_until_complete(_collect_sse_events("Какое население будет в Ташкенте в 2030 году?"))
+        search_pop = next(e for e in events_pop if e["event"] == "search.completed")
+        assert search_pop["data"].get("selected_indicator_id") == 246, f"Wrong population indicator: {search_pop['data']}"
+
+        done_pop = next(e for e in events_pop if e["event"] == "done")
+        assert done_pop["data"].get("all_passed") is True
+        ans_pop = done_pop["data"].get("answer", "")
+        assert "прогноз" in ans_pop.lower() and "составляет" in ans_pop.lower(), f"Answer is not Russian: {ans_pop}"
+        print(f"  -> [OK] 2030 население Ташкента: #246, javob rus tilida tasdiqlandi.")
+
+        # 3. Ekstremal gorizont (2050) ruscha ogohlantirish xabari
+        events_ext = loop.run_until_complete(_collect_sse_events("Какая инфляция будет в 2050 году?"))
+        done_ext = next(e for e in events_ext if e["event"] == "done")
+        ans_ext = done_ext["data"].get("answer", "")
+        assert "Модуль прогнозирования Aethelgard · SIAT ограничен 10-летним горизонтом" in ans_ext, f"Horizon guard failed: {ans_ext}"
+        print("  -> [OK] 2050 ekstremal gorizont: Ruscha 2036 chegarasi ogohlantirishi tasdiqlandi.")
+    finally:
+        loop.close()
+
+
 def run_all():
     print("=" * 75)
     print("AETHELGARD SIAT: MACHINE LEARNING FORECASTING TEST SUITE")
@@ -263,8 +313,9 @@ def run_all():
     test_6_zero_hallucination_verifier()
     test_7_orchestrator_forecast_stream()
     test_8_compound_mixed_forecast()
+    test_9_russian_future_forecast_regression()
     print("=" * 75)
-    print("NATIJA: Barcha 8/8 ta ML prognozlash testlari 100% muvaffaqiyatli o'tdi!")
+    print("NATIJA: Barcha 9/9 ta ML prognozlash testlari 100% muvaffaqiyatli o'tdi!")
     print("=" * 75)
 
 

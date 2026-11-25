@@ -154,6 +154,32 @@ def cyrillic_to_latin_uz(text: str) -> str:
 # -----------------------------------------------------------------------------
 
 RU_TO_UZ_TERMS = [
+    # Kelasi zamon va prognoz so'rovlari (Russian Future-Tense & Forecast)
+    (r"\bсколько\s+будет\s+стоить\b", "narxi qancha bo'ladi"),
+    (r"\bсколько\s+будут\s+стоить\b", "narxi qancha bo'ladi"),
+    (r"\bбудет\s+стоить\b", "narxi bo'ladi"),
+    (r"\bбудут\s+стоить\b", "narxi bo'ladi"),
+    (r"\bстоить\b", "narxi"),
+    (r"\bстоят\b", "narxi"),
+    (r"\bсколько\s+станет\b", "qancha bo'ladi"),
+    (r"\bсколько\s+составит\b", "qancha bo'ladi"),
+    (r"\bстанет\b", "bo'ladi"),
+    (r"\bсоставит\b", "bo'ladi"),
+    (r"\bкакая\s+будет\s+цена\b", "narxi qancha bo'ladi"),
+    (r"\bкакая\s+цена\s+будет\b", "narxi qancha bo'ladi"),
+    (r"\bкакова\s+будет\s+цена\b", "narxi qancha bo'ladi"),
+    (r"\bкакая\s+будет\b", "qanday bo'ladi"),
+    (r"\bкакое\s+будет\b", "qanday bo'ladi"),
+    (r"\bкакой\s+будет\b", "qanday bo'ladi"),
+    (r"\bкакие\s+будут\b", "qanday bo'ladi"),
+    (r"\bбудет\b", "bo'ladi"),
+    (r"\bбудут\b", "bo'ladi"),
+    (r"\bпрогноз\s+цен(?:ы)?(?:\s+на)?\b", "narxi prognozi"),
+    (r"\bпрогноз\s+стоимости(?:\s+на)?\b", "narxi prognozi"),
+    (r"\bпрогноз(?:ы|а|ов)?\b", "prognozi"),
+    (r"\bпрогнозируется\b", "prognoz qilinadi"),
+    (r"\bожидается\b", "kutilmoqda"),
+
     # Savol olmoshlari va harakatlar
     (r"\bсколько\s+стоил[аои]?\b", "narxi qancha edi"),
     (r"\bсколько\s+стоит\b", "narxi qancha"),
@@ -182,7 +208,7 @@ RU_TO_UZ_TERMS = [
     (r"\bкурятин[аыуеом]\b", "tovuq go'shti"),
     (r"\bкуриц[аыуеом]\b", "tovuq go'shti"),
     (r"\bмяс[оаеом]\b", "go'sht"),
-    (r"\bяйц[аое]\b", "tuxum"),
+    (r"\b(?:яйц[аоеу]|яйцах|яиц)\b", "tuxum"),
     (r"\bдесяток\s+яиц\b", "10 dona tuxum"),
     (r"\bкартофел[ьяеюем]\b", "kartoshka"),
     (r"\bкартошк[аиуеой]\b", "kartoshka"),
@@ -243,8 +269,10 @@ RU_TO_UZ_TERMS = [
     (r"\bноябр[ьяе]\b", "noyabr"),
     (r"\bдекабр[ьяе]\b", "dekabr"),
     (r"\bквартал[ае]?\b", "chorak"),
+    (r"\b(?:в|на)\s*(\d{4})\s*(?:-?й)?\s*год[ауеом]?\b", r"\1-yilda"),
     (r"\b(\d{4})\s*год[ауеом]?\b", r"\1-yilda"),
-    (r"\bв\s*(\d{4})\b", r"\1-yilda"),
+    (r"\b(?:в|на)\s*(\d{4})\b", r"\1-yilda"),
+    (r"\bгод[ауеом]?\b", "yil"),
     (r"\bсейчас\b", "hozir"),
     (r"\bпоследние\s+данные\b", "oxirgi ma'lumotlar"),
 
@@ -336,26 +364,27 @@ TYPO_RULES = [
     (r"\bkartoshk\b", "kartoshka"),
     (r"\bkartoshka([a-z]*)\b", "kartoshka"),
 
-    # So'zlashuv / qisqartmalar
+    # So'zlashuv / qisqartmalar (rekursiv takrorlanishdan himoyalangan)
     (r"\bnechpul\b", "narxi qancha"),
     (r"\bnecha\s+pul\b", "narxi qancha"),
     (r"\bnechi\s+pul\b", "narxi qancha"),
     (r"\bdoimiy\s+aholi(?:si)?(?:\s+soni)?\b", "doimiy aholi soni"),
-    (r"\baholi(?:si)?\s+soni\b", "doimiy aholi soni"),
+    (r"\b(?<!doimiy\s)aholi(?:si)?\s+soni\b", "doimiy aholi soni"),
     (r"\bodam\s+soni\b", "doimiy aholi soni"),
     (r"\bnechta\s+odam\b", "doimiy aholi soni"),
     (r"\bodam\s+yashaydi\b", "doimiy aholi soni"),
     (r"\bkishi\s+yashaydi\b", "doimiy aholi soni"),
-    (r"\baholi(?:si)?(?!\s+zichlig)\s+(?:nechta|qancha)\b", "doimiy aholi soni"),
-    (r"\b(?:nechta|qancha)\s+aholi(?:si)?(?!\s+zichlig)\b", "doimiy aholi soni"),
-    (r"\baholi(?:si)?(?!\s+zichlig)\b", "doimiy aholi soni"),
+    (r"\b(?<!doimiy\s)(?:nechta|qancha)\s+aholi(?:si)?(?!\s+zichlig)\b", "doimiy aholi soni"),
+    (r"\b(?<!doimiy\s)aholi(?:si)?(?!\s+zichlig)(?:\s+(?:nechta|qancha))?\b", "doimiy aholi soni"),
+    (r"\bo['`]?rtacha\s+hisoblangan\s+oylik\s+ish\s+haqi\b", "o'rtacha hisoblangan oylik ish haqi"),
     (r"\bo['`]?rtacha\s+(?:hisoblangan\s+)?(?:oylik\s+)?maosh\b", "o'rtacha hisoblangan oylik ish haqi"),
-    (r"\bo['`]?rtacha\s+(?:hisoblangan\s+)?oylik\b", "o'rtacha hisoblangan oylik ish haqi"),
+    (r"\bo['`]?rtacha\s+hisoblangan\s+oylik(?!\s+ish\s+haqi)\b", "o'rtacha hisoblangan oylik ish haqi"),
+    (r"\bo['`]?rtacha\s+oylik(?!\s+ish\s+haqi)\b", "o'rtacha hisoblangan oylik ish haqi"),
     (r"\boylik\s+maosh\b", "o'rtacha hisoblangan oylik ish haqi"),
-    (r"\boyliklar\b", "o'rtacha hisoblangan oylik ish haqi"),
     (r"\bmaoshlar\b", "o'rtacha hisoblangan oylik ish haqi"),
     (r"\bmaosh\b", "o'rtacha hisoblangan oylik ish haqi"),
-    (r"\boylik\b", "o'rtacha hisoblangan oylik ish haqi"),
+    (r"\b(?<!hisoblangan\s)oyliklar\b", "o'rtacha hisoblangan oylik ish haqi"),
+    (r"\b(?<!hisoblangan\s)oylik(?!\s+ish\s+haqi)\b", "o'rtacha hisoblangan oylik ish haqi"),
 
     # Oylarning imlo variantlari
     (r"\bsentabr\b", "sentyabr"),
@@ -685,16 +714,78 @@ def normalize_input_query(query: str) -> Dict[str, Any]:
     # Imlo xatolari, inversiya ('go'sht molniki') va morfologiya
     step3 = normalize_typos_and_morphology(step2)
 
-    canonical_uz = step3.strip()
+    forecast_info = detect_forecast_intent(raw)
+    out_of_scope = is_out_of_scope_query(raw)
+
+    # Kelajak prognoz so'rovlarida RRF qidiruvini toza kanonik ko'rsatkichga yo'naltirish
+    # uchun kelasi zamon va prognoz to'ldiruvchi so'zlari tozalanadi
+    if forecast_info["is_forecast"]:
+        # 1. Ruscha va transliteratsiya qilingan kelasi zamon to'ldiruvchilari
+        clean_s = re.sub(
+            r"\b(?:skol'?ko\s+budet\s+stoit'?|budet\s+stoit'?|skol'?ko\s+stanet|skol'?ko\s+sostavit|skol'?ko|budet|budut|stoit'?|stoyat|stanet|sostavit)\b",
+            " ", step3, flags=re.IGNORECASE
+        )
+        clean_s = re.sub(
+            r"\b(?:kak(?:aya|oy|oe|ie)\s+budet(?:\s+tsena)?|kak(?:aya|oy|oe|ie)\b)",
+            " ", clean_s, flags=re.IGNORECASE
+        )
+        clean_s = re.sub(
+            r"\b(?:skolko\s+budet\s+stoit|budet\s+stoit|skolko|stoit)\b",
+            " ", clean_s, flags=re.IGNORECASE
+        )
+        # 2. O'zbekcha lotin kelasi zamon va prognoz to'ldiruvchilari
+        clean_s = re.sub(
+            r"\b(?:qanday\s+bo['`]?ladi|qanday|qancha\s+bo['`]?ladi|necha\s+bo['`]?ladi|qancha\s+boladi|necha\s+boladi|bo['`]?ladi|boladi|bo['`]?lishi|bolishi|qancha|necha|nechta)\b",
+            " ", clean_s, flags=re.IGNORECASE
+        )
+        clean_s = re.sub(
+            r"\b(?:prognoz(?:i|lar|lari|lash|ga)?|bashorat(?:i|lar|lari|lash|ga)?|kutilmoqda|kutiladi|kutilayotgan|yetadi)\b",
+            " ", clean_s, flags=re.IGNORECASE
+        )
+        # 3. O'zbekcha kirill kelasi zamon va prognoz to'ldiruvchilari
+        clean_s = re.sub(
+            r"\b(?:қандай\s+бўлади|қандай|қанча\s+бўлади|неча\s+бўлади|бўлади|прогноз(?:и|лар|лари|лаш|га)?|башорат(?:и)?|кутилмоқда|кутилади|қанча|неча)\b",
+            " ", clean_s, flags=re.IGNORECASE
+        )
+        # 4. Yil va davr shovqinlarini tozalash
+        clean_s = re.sub(r"\b(1[89]\d\d|20\d\d)(?:-yil(?:da|ga)?)?\b", " ", clean_s)
+        clean_s = re.sub(r"\b(1[89]\d\d|20\d\d)\s*йил(?:да|га)?\b", " ", clean_s)
+        clean_s = re.sub(r"\byil(?:da|ga|i|dagi|gi)?\b", " ", clean_s)
+        clean_s = re.sub(r"\bйил(?:да|га|и)?\b", " ", clean_s)
+        clean_s = re.sub(r"\b(?:v|na)\s*(\d{4})\b", " ", clean_s, flags=re.IGNORECASE)
+        clean_s = re.sub(r"\b(?:в|на)\s*(\d{4})\b", " ", clean_s, flags=re.IGNORECASE)
+        clean_s = re.sub(r"\s+", " ", clean_s).strip(" ?!,.")
+
+        # 5. Oziq-ovqat narxi so'rovlari: agar oziq-ovqat mahsuloti bo'lsa va narx so'ralgan bo'lsa,
+        # 'narxi' so'zini qo'shib yoki inversiyani to'g'rilab, to'g'ridan-to'g'ri #1308 ko'rsatkichga yo'naltirish
+        food_items = [
+            "mol go'shti", "qo'y go'shti", "tovuq go'shti", "tuxum", "kartoshka",
+            "un", "shakar", "guruch", "sut", "non", "yog'", "kungaboqar yog'i"
+        ]
+        has_food = any(fi in clean_s.lower() for fi in food_items)
+        raw_has_price = bool(re.search(r"\b(?:стоить|стоит|стоят|стоил[аои]?|цена|цены|стоимость|narx|narxi|narxlari|qancha|почем|baho)\b", raw, re.IGNORECASE))
+        if has_food and raw_has_price and "narx" not in clean_s.lower():
+            clean_s = f"{clean_s} narxi"
+        clean_s = re.sub(
+            r"^\s*narxi\s+(mol go'shti|qo'y go'shti|tovuq go'shti|tuxum|kartoshka|un|shakar|guruch|non|sut|yog')\b",
+            r"\1 narxi",
+            clean_s,
+            flags=re.IGNORECASE
+        )
+
+        if clean_s:
+            canonical_uz = clean_s
+        else:
+            canonical_uz = step3.strip()
+    else:
+        canonical_uz = step3.strip()
+
     de_apostrophed = strip_apostrophes(canonical_uz)
 
     # Umumiy mahsulot so'rovi (masalan faqat "go'sht narxi" deganda mol, qo'y, tovuq ko'rsatish)
     is_generic_meat = bool(re.search(r"\bgo['`]?sht\s+(?:narxi|qancha|bo['`]?lyapti)\b", canonical_uz.lower())) and not any(
         sp in canonical_uz.lower() for sp in ("mol", "qo'y", "qoy", "tovuq", "molniki", "qo'yniki")
     )
-
-    forecast_info = detect_forecast_intent(raw)
-    out_of_scope = is_out_of_scope_query(raw)
 
     return {
         "raw_query": raw,
@@ -710,3 +801,7 @@ def normalize_input_query(query: str) -> Dict[str, Any]:
         "has_forecast_keyword": forecast_info["has_forecast_keyword"],
         "sub_queries": split_compound_query(raw)
     }
+
+
+# Qulaylik va to'g'ridan-to'g'ri import uchun alias
+normalize_query = normalize_input_query

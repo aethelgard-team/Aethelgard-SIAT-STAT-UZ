@@ -94,7 +94,10 @@ STOPWORDS = {
     "mamlakat", "mamlakatda", "bo'yicha", "boyicha", "rostmi", "togrimi", "to'g'rimi",
     "rost", "haqiqatmi", "bormi", "yoqmi", "yo'qmi", "tushgani", "oshgani", "yetgani",
     "bolgani", "bo'lgani", "so'm", "som", "sum", "dollar", "valyuta",
-    "hozir", "hozirgi", "hozirda", "oxirgi", "so'nggi", "mavjud", "kakaya", "kakoy", "skolko"
+    "hozir", "hozirgi", "hozirda", "oxirgi", "so'nggi", "mavjud", "kakaya", "kakoy", "skolko",
+    "budet", "budut", "stoit", "stoit'", "skol'ko", "stanet", "sostavit", "kakoe", "kakie",
+    "prognoz", "prognozi", "bashorat", "bashorati", "kutilmoqda", "kutiladi", "yilga", "yilgi",
+    "bolishi", "bo'lishi", "қанча", "бўлади", "прогноз", "йилда"
 }
 
 # Asosiy predmetni tekshirishda ixtiyoriy bo'lgan statistik sifatlar
@@ -244,7 +247,9 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
         expanded_q = re.sub(pat, rep, expanded_q)
 
     # 1. Barcha yillar (1800..2099, shu jumladan 1920, 2032 va h.k. tuzoqlar uchun)
-    years = [int(y) for y in re.findall(r"\b(1[89]\d\d|20\d\d)\b", q_norm)]
+    years = [int(y) for y in re.findall(r"\b(1[89]\d\d|20\d\d)\b", query + " " + q_norm)]
+    if norm.get("target_year") and norm["target_year"] not in years:
+        years.append(norm["target_year"])
 
     # 2. Aniq davr formati (masalan: 2026-M09, 2026-M03, 2026-Q3)
     explicit_m = re.search(r"\b(1[89]\d\d|20\d\d)-[mM](\d{1,2})\b", q_norm)
@@ -416,6 +421,17 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
     for m_name in MONTH_MAP.keys():
         cleaned = re.sub(rf"\b{re.escape(m_name)}(?:da|i|oyida|dan|gacha|lar|larga|ga)?\b", " ", cleaned)
 
+    # Kelasi zamon va prognoz to'ldiruvchilarini tozalash
+    for pat in [
+        r"\b(?:skol'?ko\s+budet\s+stoit'?|budet\s+stoit'?|skol'?ko|budet|budut|stoit'?|stoyat|stanet|sostavit)\b",
+        r"\b(?:kak(?:aya|oy|oe|ie)\s+budet|kak(?:aya|oy|oe|ie))\b",
+        r"\b(?:qanday\s+bo['`]?ladi|qanday|qancha\s+bo['`]?ladi|necha\s+bo['`]?ladi|bo['`]?ladi|boladi|bo['`]?lishi|bolishi|qancha|necha|nechta)\b",
+        r"\b(?:prognoz(?:i|lar|lari|lash|ga)?|bashorat(?:i|lar|lari|lash|ga)?|kutilmoqda|kutiladi|kutilayotgan|yetadi)\b",
+        r"\b(?:қандай\s+бўлади|қандай|қанча\s+бўлади|неча\s+бўлади|бўлади|прогноз(?:и|лар|лари|лаш|га)?|башорат(?:и)?|кутилмоқда|кутилади|қанча|неча)\b",
+        r"\b(?:yil(?:da|ga|i|dagi|gi)?|йил(?:да|га|и)?)\b"
+    ]:
+        cleaned = re.sub(pat, " ", cleaned, flags=re.IGNORECASE)
+
     # Mamlakat nomini qidiruv shovqinidan chiqarish (hudud sifatida alohida saqlanadi)
     cleaned_no_country = re.sub(r"\bo['`]?zbekiston(?:ning|da|dagi|ga|dan|i)?\b", " ", cleaned)
     cleaned_no_country = re.sub(r"\bress?publikasi(?:da|ning|ga)?\b", " ", cleaned_no_country)
@@ -450,7 +466,12 @@ def analyze_question_full(query: str) -> Dict[str, Any]:
         topic_tokens.append(w_stem)
 
     core_search = " ".join(search_words).strip()
-    if ("narx" in q_norm or "baho" in q_norm or "price" in q_norm) and "narx" not in core_search:
+    food_stems = ("mol", "qo'y", "tovuq", "tuxum", "kartoshka", "shakar", "guruch", "sut", "non", "yog'", "un")
+    has_food_prod = any(f in core_search for f in food_stems) or bool(target_item_code)
+    has_price_query = any(w in (query + " " + q_norm).lower() for w in ("narx", "narxi", "baho", "price", "стоимость", "цена", "стоит", "стоить", "почем"))
+    if has_food_prod and has_price_query and "narx" not in core_search:
+        core_search = (core_search + " narxi").strip()
+    elif ("narx" in q_norm or "baho" in q_norm or "price" in q_norm) and "narx" not in core_search:
         core_search = (core_search + " narxi").strip()
     if not core_search:
         core_search = q_norm
@@ -1712,7 +1733,12 @@ async def orchestrate_question(question: str) -> AsyncGenerator[str, None]:
         await asyncio.sleep(0.01)
 
         if not selected_indicator_id or not topic_valid:
-            no_data_msg = "Kechirasiz, ushbu mavzu bo'yicha DWH bazasida rasmiy statistik ko'rsatkich topilmadi."
+            if lang == "ru":
+                no_data_msg = "К сожалению, по данной теме в базе DWH официальный статистический показатель не найден."
+            elif lang == "uz_cyrl":
+                no_data_msg = "Кечирасиз, ушбу мавзу бўйича DWH базасида расмий статистик кўрсаткич топилмади."
+            else:
+                no_data_msg = "Kechirasiz, ushbu mavzu bo'yicha DWH bazasida rasmiy statistik ko'rsatkich topilmadi."
             yield format_sse("verification.completed", {
                 "stage": "verify",
                 "all_passed": True,
